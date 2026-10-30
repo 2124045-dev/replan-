@@ -1,0 +1,2222 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>RePlan</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=BIZ+UDGothic:wght@400;700&family=BIZ+UDPGothic:wght@400;700&family=Dela+Gothic+One&display=swap">
+<style>
+/* Layout: スマホ1カラムの手帳。上に判定、まん中に今日の配分、根拠タブに全ルールとコード。
+   紙＝少し青みの白、鉛筆の黒、青ペン（操作できるもの・行き先）、蛍光ペン（今日の判定）だけで組む */
+:root {
+  --paper: #F4F6F3;
+  --sheet: #FFFFFF;
+  --grid: #D3DDE4;
+  --grid-strong: #A8B8C5;
+  --ink: #22262B;
+  --ink-2: #59616A;
+  --ink-3: #868E97;
+  --pen: #2445A2;
+  --marker: #FFE24A;
+  --on-marker: #22262B;
+  --sleep: #343C49;
+  --good: #2D7649;
+  --warn: #8F5B00;
+  --risk: #B0281D;
+  --risk-soft: rgba(176, 40, 29, 0.13);
+  --font-display: "Dela Gothic One", "BIZ UDPGothic", "Hiragino Sans", "Yu Gothic", sans-serif;
+  --font-body: "BIZ UDPGothic", "Hiragino Sans", "Yu Gothic", "Noto Sans JP", system-ui, sans-serif;
+  --font-data: "BIZ UDGothic", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #121518;
+    --sheet: #1A1E23;
+    --grid: #29333D;
+    --grid-strong: #3E4C59;
+    --ink: #E5E8EC;
+    --ink-2: #A5ADB6;
+    --ink-3: #77808A;
+    --pen: #93AEF7;
+    --marker: #E6C83A;
+    --on-marker: #121518;
+    --sleep: #B8C5D6;
+    --good: #6FBF8E;
+    --warn: #DFA644;
+    --risk: #F0877C;
+    --risk-soft: rgba(240, 135, 124, 0.16);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #121518;
+  --sheet: #1A1E23;
+  --grid: #29333D;
+  --grid-strong: #3E4C59;
+  --ink: #E5E8EC;
+  --ink-2: #A5ADB6;
+  --ink-3: #77808A;
+  --pen: #93AEF7;
+  --marker: #E6C83A;
+  --on-marker: #121518;
+  --sleep: #B8C5D6;
+  --good: #6FBF8E;
+  --warn: #DFA644;
+  --risk: #F0877C;
+  --risk-soft: rgba(240, 135, 124, 0.16);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.7;
+}
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0 0 auto;
+  height: env(safe-area-inset-top, 0px);
+  z-index: 10;
+  background: var(--paper);
+}
+button, input { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--pen); outline-offset: 2px; }
+.num { font-family: var(--font-data); font-variant-numeric: tabular-nums; }
+
+.app {
+  max-width: 520px;
+  margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 4px calc(96px + env(safe-area-inset-bottom, 0px));
+}
+.app.wide { max-width: 860px; }
+
+/* ── 上の帯 ── */
+.top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding-block: 12px 8px;
+}
+.brand { font-family: var(--font-data); font-weight: 700; font-size: 16px; letter-spacing: 0.06em; }
+.brand small { font-family: var(--font-body); font-weight: 400; font-size: 11px; letter-spacing: 0.04em; color: var(--ink-3); margin-left: 8px; }
+.top-date { font-family: var(--font-data); font-size: 13px; color: var(--ink-2); }
+
+.sample {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 10px 12px;
+  border: 1.5px dashed var(--grid-strong);
+  border-radius: 4px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--ink-2);
+}
+.sample > span { flex: 1 1 220px; min-width: 0; }
+.sample b { color: var(--ink); }
+
+/* ── 判定（ヒーロー） ── */
+.hero { padding-block: 20px 4px; }
+.eyebrow { margin: 0 0 2px; font-size: 12px; letter-spacing: 0.1em; color: var(--ink-2); }
+.zone-word {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(46px, 14vw, 68px);
+  line-height: 1.12;
+  letter-spacing: 0.02em;
+  text-wrap: balance;
+}
+.mark {
+  padding: 0 0.06em;
+  background: linear-gradient(transparent 54%, var(--marker) 54%, var(--marker) 90%, transparent 90%);
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+.meter { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; margin-top: 16px; }
+.seg {
+  display: grid;
+  gap: 1px;
+  padding: 6px 6px 5px;
+  border: 1.5px solid var(--grid-strong);
+  border-radius: 3px;
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--ink-3);
+}
+.seg b { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.seg small { font-family: var(--font-data); font-size: 10px; }
+.seg.on { border-color: var(--ink); background: var(--marker); color: var(--on-marker); }
+.calc { display: grid; gap: 2px; margin: 14px 0 0; }
+.calc > div { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 12px; }
+.calc dt { min-width: 6.5em; font-size: 13px; color: var(--ink-2); }
+.calc dd { margin: 0; font-family: var(--font-data); font-size: 14px; white-space: nowrap; }
+.calc dd b { font-size: 26px; font-weight: 700; }
+.calc dd .of { font-size: 12px; color: var(--ink-2); }
+.formula { margin: 14px 0 0; font-size: 14px; color: var(--ink-2); line-height: 1.9; }
+.formula .num { color: var(--ink); }
+.formula .big { font-size: 24px; font-weight: 700; }
+.formula .of { font-family: var(--font-data); font-size: 12px; margin-right: 6px; }
+.formula .arrow { margin: 0 6px; color: var(--ink-3); }
+.formula-sub { margin: 2px 0 0; font-size: 13px; color: var(--ink-2); }
+.hint { margin: 8px 0 0; font-size: 13px; line-height: 1.7; color: var(--ink-2); max-width: 62ch; }
+
+/* ── 区画 ── */
+.block { margin-top: 32px; }
+.block > h2 {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin: 0 0 10px;
+  padding-bottom: 6px;
+  border-bottom: 1.5px solid var(--ink);
+  font-size: 15px;
+  font-weight: 700;
+  text-wrap: balance;
+}
+.block > h2 .aside { margin-left: auto; font-family: var(--font-data); font-weight: 400; font-size: 12px; color: var(--ink-2); }
+.block > p { margin: 8px 0 0; max-width: 62ch; }
+.empty { padding: 14px 0; font-size: 14px; color: var(--ink-2); list-style: none; }
+
+.sheet { background: var(--sheet); border: 1px solid var(--grid); border-radius: 6px; }
+
+/* ── けさの記録（指標） ── */
+.ind { display: grid; gap: 10px; padding: 14px 14px 12px; min-width: 0; }
+.ind + .ind { border-top: 1px solid var(--grid); }
+.ind-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.ind-head h3 { margin: 0; font-size: 15px; font-weight: 700; }
+.ind-head h3 small { margin-left: 6px; font-family: var(--font-data); font-weight: 400; font-size: 11px; color: var(--ink-3); }
+.pts { display: inline-flex; align-items: center; gap: 4px; font-family: var(--font-data); font-size: 13px; white-space: nowrap; }
+.pts i { display: inline-block; width: 12px; height: 12px; border: 1.5px solid var(--ink); border-radius: 2px; }
+.pts i.on { background: var(--ink); }
+.pts.none { color: var(--ink-3); }
+.pts.none i { border-color: var(--ink-3); }
+
+.sleep-inputs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.tfield { display: grid; gap: 2px; font-size: 12px; color: var(--ink-2); }
+.tfield input {
+  width: 100%;
+  min-width: 0;
+  padding: 6px 8px;
+  border: 1.5px solid var(--grid-strong);
+  border-radius: 3px;
+  background: var(--paper);
+  font-family: var(--font-data);
+  font-size: 18px;
+}
+.chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.chips-label { flex-basis: 100%; font-size: 12px; color: var(--ink-2); }
+.chip {
+  padding: 3px 10px;
+  border: 1.5px solid var(--grid-strong);
+  border-radius: 999px;
+  background: transparent;
+  font-family: var(--font-data);
+  font-size: 13px;
+  cursor: pointer;
+}
+.chip[aria-pressed="true"] { border-color: var(--ink); background: var(--ink); color: var(--paper); }
+.value-line { margin: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; font-size: 13px; color: var(--ink-2); }
+.value-line b { font-size: 18px; color: var(--ink); }
+.value-line .sub { font-size: 12px; }
+
+.cells { display: grid; gap: 4px; }
+.cell {
+  height: 42px;
+  min-width: 0;
+  padding: 0;
+  border: 1.5px solid var(--grid-strong);
+  border-radius: 3px;
+  background: var(--paper);
+  font-family: var(--font-data);
+  font-size: 15px;
+  cursor: pointer;
+}
+.cell:hover { border-color: var(--ink); }
+.cell[aria-pressed="true"] { border-color: var(--ink); background: var(--ink); color: var(--paper); font-weight: 700; }
+.cell-label { margin: 0; min-height: 1.7em; font-size: 13px; color: var(--ink-2); }
+
+.band { position: relative; display: grid; gap: 4px; margin-top: 2px; font-family: var(--font-data); font-size: 11px; color: var(--ink-3); }
+.band-seg { display: grid; padding-top: 3px; border-top: 3px solid var(--grid); text-align: center; line-height: 1.4; }
+.band-seg small { font-size: 10px; }
+.band-seg.hit { border-top-color: var(--ink); color: var(--ink); font-weight: 700; }
+.band-pin {
+  position: absolute;
+  top: -10px;
+  width: 0;
+  height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 8px solid var(--pen);
+  transform: translateX(-6px);
+}
+
+.weekbars { display: block; width: 100%; height: auto; max-width: 100%; }
+.wb-bar { fill: var(--sleep); }
+.wb-bar.p1 { fill: var(--warn); }
+.wb-bar.p2 { fill: var(--risk); }
+.wb-none { fill: var(--grid-strong); }
+.wb-ref { stroke: var(--ink-3); stroke-width: 1; stroke-dasharray: 3 3; }
+.wb-ref-lab, .wb-lab { fill: var(--ink-2); font-family: var(--font-data); font-size: 10px; }
+.wb-lab { text-anchor: middle; }
+
+.why { font-size: 13px; color: var(--ink-2); }
+.why > summary {
+  display: inline-flex;
+  gap: 6px;
+  align-items: baseline;
+  color: var(--pen);
+  cursor: pointer;
+  list-style: none;
+}
+.why > summary::-webkit-details-marker { display: none; }
+.why > summary::before { content: "＋"; font-family: var(--font-data); }
+.why[open] > summary::before { content: "－"; }
+.why p { margin: 8px 0 0; max-width: 62ch; line-height: 1.75; }
+.why .why-note { color: var(--ink-3); }
+.cite { font-family: var(--font-data); font-size: 12px; color: var(--ink-3); }
+.block > .why { display: block; margin-top: 10px; }
+
+/* ── タスクの行 ── */
+.list { margin: 0; padding: 0; list-style: none; }
+.task {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  gap: 4px 10px;
+  align-items: start;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--grid);
+}
+.task.plain { grid-template-columns: minmax(0, 1fr) auto; }
+.task.risk { grid-template-columns: auto minmax(0, 1fr); }
+.check {
+  position: relative;
+  width: 26px;
+  height: 26px;
+  margin-top: 1px;
+  border: 2px solid var(--ink);
+  border-radius: 3px;
+  background: var(--sheet);
+  cursor: pointer;
+}
+.check:hover { background: var(--marker); }
+.task-main { display: grid; gap: 2px; min-width: 0; justify-items: start; }
+.task-title { font-size: 15px; font-weight: 700; line-height: 1.5; overflow-wrap: anywhere; }
+.task-meta { font-size: 12px; line-height: 1.6; color: var(--ink-2); }
+.task-min { font-family: var(--font-data); font-size: 21px; font-weight: 700; line-height: 1.2; white-space: nowrap; }
+.task-min small { margin-left: 1px; font-size: 11px; font-weight: 400; }
+.task.moved .task-title {
+  color: var(--ink-2);
+  text-decoration: line-through;
+  text-decoration-thickness: 1.5px;
+  text-decoration-color: var(--ink-2);
+}
+.moved-mark {
+  width: 26px;
+  height: 26px;
+  margin-top: 1px;
+  border: 1.5px dashed var(--grid-strong);
+  border-radius: 3px;
+}
+.moved-to { font-family: var(--font-data); font-size: 14px; font-weight: 700; color: var(--pen); white-space: nowrap; }
+.tag {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 0 6px;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.6;
+  vertical-align: 2px;
+  white-space: nowrap;
+}
+.tag.pen { color: var(--pen); }
+.tag.risk { color: var(--risk); }
+.risk-lead { padding: 10px 12px; border-radius: 4px; background: var(--risk-soft); }
+.risk-lead b { color: var(--risk); font-size: 18px; }
+
+.btn {
+  padding: 8px 14px;
+  border: 1.5px solid var(--ink);
+  border-radius: 4px;
+  background: var(--ink);
+  color: var(--paper);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.btn.ghost { background: transparent; color: var(--ink); }
+.btn.danger { border-color: var(--risk); background: var(--risk); color: var(--sheet); }
+.btn-text {
+  padding: 2px 0;
+  border: 0;
+  background: none;
+  color: var(--pen);
+  font-size: 13px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.btn-text.danger-text { color: var(--risk); }
+.row-btns { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.confirm { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 13px; }
+
+.done-form { display: grid; gap: 10px; padding: 14px; }
+.done-form p { margin: 0; }
+
+/* ── 時間の目安 ── */
+.big2 { font-size: 20px; font-weight: 700; }
+.ruler {
+  position: relative;
+  height: 30px;
+  margin-top: 26px;
+  border: 1px solid var(--grid-strong);
+  background: repeating-linear-gradient(to right, var(--grid) 0 1px, transparent 1px calc(100% / 24));
+}
+.r-after { position: absolute; top: 0; right: 0; bottom: 0; background: repeating-linear-gradient(135deg, var(--risk-soft) 0 5px, transparent 5px 10px); }
+.r-line { position: absolute; top: -6px; bottom: -6px; width: 2px; margin-left: -1px; background: var(--risk); }
+.r-now { position: absolute; top: -22px; bottom: 0; width: 2px; margin-left: -1px; background: var(--pen); }
+.r-now em { position: absolute; top: 0; left: 6px; font-style: normal; font-size: 11px; font-weight: 700; color: var(--pen); white-space: nowrap; }
+.r-labels { position: relative; height: 20px; margin-top: 4px; font-family: var(--font-data); font-size: 11px; color: var(--ink-2); }
+.r-lab { position: absolute; transform: translateX(-50%); white-space: nowrap; }
+.r-lab:first-child { transform: none; }
+.r-lab:last-child { transform: translateX(-100%); }
+.r-lab.key { color: var(--risk); font-weight: 700; }
+.nap { margin-top: 18px; padding-top: 12px; border-top: 1px dashed var(--grid-strong); }
+.nap p { margin: 0; }
+
+/* ── 予定タブ ── */
+.days { display: grid; gap: 14px; }
+.day { display: grid; gap: 6px; }
+.day-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 8px; font-size: 14px; }
+.day-head .num { margin-left: auto; font-size: 12px; color: var(--ink-2); }
+.day-bar { position: relative; height: 8px; border: 1px solid var(--grid-strong); border-radius: 2px; overflow: hidden; }
+.day-bar span { position: absolute; top: 0; bottom: 0; left: 0; background: var(--ink); }
+.day.today .day-bar span { background: var(--marker); }
+.day-items { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; font-size: 13px; color: var(--ink-2); }
+.day-items li { display: flex; gap: 10px; min-width: 0; }
+.day-items li span:first-child { min-width: 0; overflow-wrap: anywhere; }
+.day-items .m { margin-left: auto; font-family: var(--font-data); white-space: nowrap; }
+.day-empty { margin: 0; font-size: 13px; color: var(--ink-3); }
+
+.tform { display: grid; gap: 12px; padding: 14px; margin-bottom: 10px; }
+.field { display: grid; gap: 3px; min-width: 0; font-size: 12px; color: var(--ink-2); }
+.field input, .step-row input {
+  width: 100%;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1.5px solid var(--grid-strong);
+  border-radius: 3px;
+  background: var(--paper);
+  font-size: 16px;
+}
+.field input[readonly] { color: var(--ink-2); border-style: dashed; }
+.field-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.steps-list { display: grid; gap: 6px; margin-top: 8px; }
+.step-row { display: grid; grid-template-columns: minmax(0, 1fr) 76px auto; gap: 6px; align-items: center; }
+.form-error { margin: 0; font-size: 13px; color: var(--risk); }
+.task-edit { padding: 8px 0; border-bottom: 1px solid var(--grid); }
+.tasklist { margin-top: 12px; }
+
+/* ── 記録タブ ── */
+.diary { display: grid; gap: 3px; }
+.d-row { display: grid; grid-template-columns: 58px minmax(0, 1fr) 40px; gap: 8px; align-items: center; font-family: var(--font-data); font-size: 11px; color: var(--ink-2); }
+.d-row.today .d-date { color: var(--ink); font-weight: 700; }
+.d-track {
+  position: relative;
+  height: 14px;
+  border-left: 1px solid var(--grid-strong);
+  border-right: 1px solid var(--grid-strong);
+  background: repeating-linear-gradient(to right, var(--grid) 0 1px, transparent 1px calc(100% / 24));
+}
+.d-bar { position: absolute; top: 2px; bottom: 2px; border-radius: 1px; background: var(--sleep); }
+.d-dur { text-align: right; font-weight: 700; }
+.d-dur.p0 { color: var(--good); }
+.d-dur.p1 { color: var(--warn); }
+.d-dur.p2 { color: var(--risk); }
+.d-head { margin-bottom: 2px; }
+.d-hours { position: relative; height: 14px; }
+.d-hours span { position: absolute; transform: translateX(-50%); }
+.d-hours span:first-child { transform: none; }
+.d-hours span:last-child { transform: translateX(-100%); }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 10px 0 0; font-size: 12px; color: var(--ink-2); }
+.lg::before { content: ""; display: inline-block; width: 10px; height: 10px; margin-right: 5px; border-radius: 2px; vertical-align: -1px; }
+.lg.p0::before { background: var(--good); }
+.lg.p1::before { background: var(--warn); }
+.lg.p2::before { background: var(--risk); }
+.sri { margin-top: 16px; padding: 12px 14px; border: 1px solid var(--grid); border-radius: 6px; background: var(--sheet); }
+.sri-num { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; font-size: 13px; color: var(--ink-2); }
+.sri-num b { font-size: 30px; color: var(--ink); }
+.sri p { margin: 4px 0 0; font-size: 13px; color: var(--ink-2); }
+
+.strip { display: block; width: 100%; height: auto; margin-top: 10px; }
+.st-axis { stroke: var(--grid-strong); stroke-width: 1; }
+.st-one { stroke: var(--ink-3); stroke-width: 1; stroke-dasharray: 3 3; }
+.st-dot { fill: var(--sleep); fill-opacity: 0.75; }
+.st-m { fill: var(--marker); stroke: var(--ink); stroke-width: 1.5; }
+.st-lab { fill: var(--ink-2); font-family: var(--font-data); font-size: 10px; text-anchor: middle; }
+.rec-list { display: grid; gap: 2px; margin: 10px 0 0; padding: 0; list-style: none; font-size: 13px; }
+.rec-list li { display: grid; grid-template-columns: minmax(0, 1fr) auto 56px; gap: 10px; padding: 4px 0; border-bottom: 1px dotted var(--grid); }
+.rec-list li span:first-child { overflow-wrap: anywhere; }
+.rec-list .num { text-align: right; color: var(--ink-2); }
+
+.table-wrap { overflow-x: auto; }
+.ztable { width: 100%; border-collapse: collapse; font-size: 13px; }
+.ztable th, .ztable td { padding: 7px 6px; border-bottom: 1px solid var(--grid); text-align: left; white-space: nowrap; }
+.ztable th { font-size: 11px; font-weight: 700; color: var(--ink-2); }
+.ztable td.num { text-align: right; }
+.rbar { display: inline-block; width: 44px; height: 6px; margin-left: 6px; border: 1px solid var(--grid-strong); vertical-align: 1px; }
+.rbar i { display: block; height: 100%; background: var(--ink); }
+
+.pro { padding: 0 0 4px; }
+.pro-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.pro-list li { display: grid; gap: 1px; padding: 10px 12px; border: 1.5px dashed var(--grid-strong); border-radius: 4px; }
+.pro-list b { font-size: 14px; }
+.pro-list span { font-size: 12px; color: var(--ink-2); }
+
+/* ── 根拠タブ ── */
+.flow { margin: 10px 0 0; padding-left: 1.6em; display: grid; gap: 4px; }
+.flow li { padding-left: 4px; }
+.flow li::marker { font-family: var(--font-data); font-weight: 700; }
+.legend-kinds { display: flex; flex-wrap: wrap; gap: 6px 12px; margin: 0 0 6px; font-size: 12px; color: var(--ink-2); align-items: center; }
+.rule { display: grid; gap: 4px; padding: 12px 0; border-bottom: 1px solid var(--grid); }
+.rule h3 { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; margin: 0; font-size: 14px; }
+.rule p { margin: 0; font-size: 13px; color: var(--ink-2); max-width: 66ch; }
+.rule .fn { font-family: var(--font-data); font-size: 11px; color: var(--ink-3); }
+.kind {
+  padding: 0 6px;
+  border: 1.5px solid var(--ink);
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.6;
+  white-space: nowrap;
+}
+.kind.math { background: var(--ink); color: var(--paper); }
+.kind.assume { border-style: dashed; border-color: var(--ink-2); color: var(--ink-2); }
+
+fieldset { margin: 0; padding: 0; border: 0; min-width: 0; }
+legend { padding: 0; margin-bottom: 6px; font-size: 13px; font-weight: 700; }
+.form-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 10px; }
+.form-grid.seven { grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); }
+
+.plain-list { margin: 10px 0 0; padding-left: 1.2em; display: grid; gap: 8px; font-size: 14px; }
+.plain-list li { max-width: 66ch; }
+.plain-list .cite { display: block; }
+
+.code-wrap { max-height: 440px; overflow: auto; border: 1px solid var(--grid); border-radius: 6px; background: var(--sheet); }
+.code-wrap.open { max-height: none; }
+pre.code { margin: 0; padding: 14px 16px; font-family: var(--font-data); font-size: 12px; line-height: 1.7; white-space: pre; tab-size: 2; }
+pre.code .c { color: var(--pen); }
+
+.refs { display: grid; gap: 8px; margin: 10px 0 0; padding: 0; list-style: none; font-size: 13px; line-height: 1.6; }
+.refs li { padding-left: 1.4em; text-indent: -1.4em; overflow-wrap: anywhere; }
+.refs a { color: var(--pen); }
+
+/* ── 下のタブ ── */
+.tabs {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 20;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  border-top: 1.5px solid var(--ink);
+  background: var(--paper);
+}
+.tabs-inner { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); max-width: 520px; margin: 0 auto; }
+.tabs a { display: grid; place-items: center; height: 54px; color: var(--ink-2); font-size: 14px; font-weight: 700; text-decoration: none; }
+.tabs a[aria-current="page"] { color: var(--ink); }
+.tabs a[aria-current="page"] span { background: linear-gradient(transparent 55%, var(--marker) 55%, var(--marker) 92%, transparent 92%); padding: 0 0.2em; }
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(68px + env(safe-area-inset-bottom, 0px));
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  max-width: calc(100% - 32px);
+  padding: 10px 14px;
+  border-radius: 6px;
+  background: var(--ink);
+  color: var(--paper);
+  font-size: 13px;
+  transform: translateX(-50%);
+}
+.toast button { padding: 0; border: 0; background: none; color: var(--marker); font-weight: 700; cursor: pointer; white-space: nowrap; }
+
+@media (min-width: 720px) {
+  .rules-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 28px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
+}
+
+[hidden] { display: none !important; }
+.basis-title { font-size: clamp(34px, 9vw, 50px); }
+</style>
+<div class="app" id="app">
+  <header class="top">
+    <div class="brand">RePlan<small>予定を減らす手帳</small></div>
+    <div class="top-date" id="topDate"></div>
+  </header>
+  <div class="sample" id="sampleBar" hidden></div>
+  <main id="view"></main>
+</div>
+<nav class="tabs" aria-label="画面の切り替え">
+  <div class="tabs-inner">
+    <a href="#today" data-tab="today"><span>今日</span></a>
+    <a href="#tasks" data-tab="tasks"><span>予定</span></a>
+    <a href="#log" data-tab="log"><span>記録</span></a>
+    <a href="#basis" data-tab="basis"><span>根拠</span></a>
+  </div>
+</nav>
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+<script id="logic">
+/* ================================================================
+   RePlan 判定ロジック
+   ・このスクリプトは「根拠」タブにそのまま表示されています。
+     画面に出ているコードと、実際に動いているコードは同じものです。
+   ・ここに置いているのは「入力が同じなら出力も必ず同じ」になる計算だけです。
+     画面の表示や保存の処理は、別のスクリプトに分けています。
+   ================================================================ */
+
+
+/* ── 1. 研究・指針から決めた基準 ─────────────────────────── */
+
+const CRITERIA = {
+  // 睡眠時間（時間）
+  //   7 … NSFが18〜25歳に推奨する範囲（7〜9時間）の下限
+  //   6 … これ未満をNSFは18〜25歳に「推奨しない」。厚労省の成人の目安も「6時間以上」
+  //   出典：Hirshkowitz ほか (2015)、厚生労働省 (2024)
+  sleep: { ok: 7, low: 6 },
+
+  // 眠気 KSS（1〜9）
+  //   7 … 尺度の言葉で初めて「眠い」になる段階
+  //   8 … 起きているのに努力が要る段階。眠気が高いほど成績の悪化が急になる
+  //   出典：Åkerstedt & Gillberg (1990)、Kaida ほか (2006)、Ingre ほか (2006)
+  kss: { one: 7, two: 8 },
+
+  // 疲れ Samn-Perelli（1〜7）
+  //   4 … 「少し疲れている」
+  //   6 … 「非常に疲れていて、集中が非常に難しい」
+  //   出典：Samn & Perelli (1982)
+  sp: { one: 4, two: 6 },
+
+  // 起床から何時間後を「注意の要る作業を置かない」目安にするか
+  //   17 … 成績が血中アルコール濃度0.05%のときと同程度まで下がった（Dawson & Reid, 1997）
+  wakeHours: 17,
+};
+
+
+/* ── 2. 設計上の仮定（研究からは直接決まらない値）────────────
+   根拠タブの「仮定の数値」で変更できます。                          */
+
+const DEFAULT_ASSUMPTIONS = {
+  // 状態ゾーンごとに、普段の作業枠を何倍にするか
+  zoneFactor: { A: 1.0, B: 0.8, C: 0.6, D: 0.4 },
+  // 曜日ごとの普段の作業枠（分）［日, 月, 火, 水, 木, 金, 土］
+  baseMinutes: [180, 180, 180, 180, 180, 180, 180],
+  // 7日平均を判定に使うのに必要な記録の数（晩）
+  minNights: 3,
+  // 見積もり補正の初期値と、それを「記録何件ぶん」として扱うか
+  estimatePrior: 1.25,
+  estimatePriorWeight: 3,
+};
+
+// 合計点（0〜8点）→ 状態ゾーン。2点ごとに1段階、6点以上はまとめて「最低限」
+const ZONES = [
+  { key: 'A', label: 'いつも通り', min: 0, max: 1 },
+  { key: 'B', label: '少し軽く',   min: 2, max: 3 },
+  { key: 'C', label: 'かなり軽く', min: 4, max: 5 },
+  { key: 'D', label: '最低限',     min: 6, max: 8 },
+];
+
+
+/* ── 3. 状態スコア：4つの指標を0〜2点にして、同じ重みで足す ────
+   重みを推定できるだけのデータがない段階では、等しい重みの単純な合計が
+   予測に強い（Dawes, 1979）。                                          */
+
+function sleepPoints(hours) {
+  if (hours >= CRITERIA.sleep.ok) return 0;
+  if (hours >= CRITERIA.sleep.low) return 1;
+  return 2;
+}
+
+function scoreState(input, a) {
+  // input = { lastSleepH, avgSleepH, nights, kss, sp }（記録がない値は null）
+  const items = [
+    { key: 'last',
+      points: input.lastSleepH == null ? null : sleepPoints(input.lastSleepH) },
+    { key: 'avg',
+      points: input.avgSleepH == null || input.nights < a.minNights
+        ? null : sleepPoints(input.avgSleepH) },
+    { key: 'kss',
+      points: input.kss == null ? null
+        : input.kss >= CRITERIA.kss.two ? 2
+        : input.kss >= CRITERIA.kss.one ? 1 : 0 },
+    { key: 'sp',
+      points: input.sp == null ? null
+        : input.sp >= CRITERIA.sp.two ? 2
+        : input.sp >= CRITERIA.sp.one ? 1 : 0 },
+  ];
+  // 記録がない指標は0点として足す（画面にも「未記録」と出す）
+  const total = items.reduce((sum, it) => sum + (it.points ?? 0), 0);
+  return { items, total, zone: zoneOf(total) };
+}
+
+function zoneOf(total) {
+  return ZONES.find(z => total >= z.min && total <= z.max) ?? ZONES[ZONES.length - 1];
+}
+
+
+/* ── 4. 睡眠の記録から数値を出す ────────────────────────────
+   ・就床が12時以降なら前日の夜、12時より前なら当日の深夜とみなす
+   ・睡眠時間 = 床にいた時間 − 眠れなかった時間（寝つき＋夜中に起きていた分）  */
+
+function sleepOf(log) {
+  if (!log || !log.bed || !log.wake) return null;
+  const day = dateToMs(log.date);
+  const bed = hmToMin(log.bed);
+  const wake = hmToMin(log.wake);
+  const bedMs = day + (bed >= 12 * 60 ? bed - 24 * 60 : bed) * 60000;
+  const wakeMs = day + wake * 60000;
+  const inBedMin = (wakeMs - bedMs) / 60000;
+  if (inBedMin < 60 || inBedMin > 16 * 60) return null;   // ありえない値は判定に使わない
+  const sleepMin = Math.max(0, inBedMin - (log.awakeMin || 0));
+  return { bedMs, wakeMs, inBedMin, sleepMin };
+}
+
+function sleepSummary(logs, todayISO) {
+  const last = sleepOf(logs[todayISO]);
+  const week = [];                                   // 今日の朝を含む直近7晩
+  for (let i = 0; i < 7; i++) {
+    const s = sleepOf(logs[addDays(todayISO, -i)]);
+    if (s) week.push(s.sleepMin);
+  }
+  return {
+    lastSleepH: last ? last.sleepMin / 60 : null,
+    avgSleepH: week.length ? sum(week) / week.length / 60 : null,
+    nights: week.length,
+  };
+}
+
+// 起床から CRITERIA.wakeHours 時間後の時刻（ミリ秒）
+function wakeLimitMs(log) {
+  const s = sleepOf(log);
+  return s ? s.wakeMs + CRITERIA.wakeHours * 3600000 : null;
+}
+
+
+/* ── 5. 見積もりのクセの補正（計画錯誤）─────────────────────
+   完了時に記録した「実際の時間 ÷ 見積もり」の中央値を使う。
+   記録が少ないうちは初期値寄り、増えるほど自分の値寄りになる：
+     m = (n × 自分の中央値 + k × 初期値) ÷ (n + k)
+   実際の時間の記録を使うと予測が正確になる（Roy ほか, 2008）。          */
+
+function estimateMultiplier(records, a) {
+  const ratios = records
+    .filter(r => r.est > 0 && r.actual > 0)
+    .map(r => r.actual / r.est);
+  const n = ratios.length;
+  const k = a.estimatePriorWeight;
+  const personal = n ? median(ratios) : null;
+  const raw = n ? (n * personal + k * a.estimatePrior) / (n + k) : a.estimatePrior;
+  return { m: round2(clamp(raw, 0.5, 3)), n, personal, prior: a.estimatePrior, k };
+}
+
+
+/* ── 6. 配分の道具：作業時間の軸 ───────────────────────────
+   今日の枠を1日目、明日の枠を2日目…とつないだ「作業時間の軸」をつくり、
+   タスクを決めた順番に並べる。日の境目をまたいだタスクは分割される。     */
+
+function makeDays(todayISO, todayBudget, a, count) {
+  const days = [];
+  for (let i = 0; i < count; i++) {
+    const date = addDays(todayISO, i);
+    days.push({ date, budget: i === 0 ? todayBudget : a.baseMinutes[weekdayOf(date)] });
+  }
+  return days;
+}
+
+// 締切日の終わりまでに使える作業時間（軸の上の位置）。締切なしは無限大。
+// 締切を過ぎているものは「今日まで」として扱う。
+function deadlineOn(days, due) {
+  if (!due) return Infinity;
+  const last = clamp(daysBetween(days[0].date, due), 0, days.length - 1);
+  let total = 0;
+  for (let i = 0; i <= last; i++) total += days[i].budget;
+  return total;
+}
+
+function allocate(jobs, days) {
+  let t = 0;
+  return jobs.map(job => {
+    const start = t;
+    const end = t + job.minutes;
+    t = end;
+    const parts = {};                                // { 'YYYY-MM-DD': 分 }
+    let dayStart = 0;
+    for (const d of days) {
+      const dayEnd = dayStart + d.budget;
+      const overlap = Math.min(end, dayEnd) - Math.max(start, dayStart);
+      if (overlap > 0.5) parts[d.date] = overlap;
+      dayStart = dayEnd;
+    }
+    const lateBy = Math.max(0, end - deadlineOn(days, job.due));
+    return { ...job, start, end, parts, lateBy };
+  });
+}
+
+
+/* ── 7. 普段のペースでも間に合わないとき：相談するタスクを最少にする ──
+   締切順に1つずつ足していき、締切を過ぎたら、それまでで一番長いタスクを外す。
+   こうして外した数が最少になることが証明されている（Moore, 1968）。
+   外したタスクは「期限の延長や範囲の縮小を相談する候補」として表示する。    */
+
+function pickToRenegotiate(jobs, days, startAt) {
+  const kept = [];
+  const out = [];
+  let t = startAt;
+  for (const job of jobs) {
+    kept.push(job);
+    t += job.minutes;
+    if (t > deadlineOn(days, job.due) + 0.5) {
+      const longest = kept.reduce((m, j) => (j.minutes > m.minutes ? j : m));
+      kept.splice(kept.indexOf(longest), 1);
+      t -= longest.minutes;
+      out.push(longest);
+    }
+  }
+  return out;
+}
+
+
+/* ── 8. 今日の計画をつくる ─────────────────────────────── */
+
+function makePlan({ tasks, todayISO, zoneKey, doneTodayMin, records, a }) {
+  const est = estimateMultiplier(records, a);
+
+  // 残り時間 = 見積もり × 補正 − すでに進めた分
+  const jobs = tasks
+    .filter(t => !t.done)
+    .map(t => ({
+      id: t.id,
+      due: t.due || null,
+      pinned: t.pinnedOn === todayISO,
+      minutes: Math.max(0, Math.round(t.estMin * est.m) - (t.progressMin || 0)),
+    }))
+    .filter(j => j.minutes > 0);
+
+  // 締切が早い順。最大の遅れが最小になる（Jackson, 1955）
+  // 締切が同じなら短い順（Smith, 1956）
+  const edd = (x, y) =>
+    (x.due ?? '9999-12-31').localeCompare(y.due ?? '9999-12-31') ||
+    x.minutes - y.minutes ||
+    String(x.id).localeCompare(String(y.id));
+
+  const pinned = jobs.filter(j => j.pinned).sort(edd);
+  const withDue = jobs.filter(j => !j.pinned && j.due).sort(edd);
+  const noDue = jobs.filter(j => !j.pinned && !j.due).sort(edd);
+
+  // 自分で「今日やる」にしたタスクは、今日の枠に上乗せする
+  const pinnedMin = sum(pinned.map(j => j.minutes));
+  const base = a.baseMinutes[weekdayOf(todayISO)];
+  const factor = a.zoneFactor[zoneKey];
+  const normalToday = Math.max(0, base - doneTodayMin) + pinnedMin;
+  const reducedToday = Math.max(0, Math.round(base * factor) - doneTodayMin) + pinnedMin;
+
+  // 何日先まで見るか：最後の締切まで。全部が収まらなければ延ばす（最大180日）
+  const lastDue = withDue.length ? Math.max(...withDue.map(j => daysBetween(todayISO, j.due))) : 0;
+  const need = sum(jobs.map(j => j.minutes));
+  let count = Math.max(14, lastDue + 1);
+  while (count < 180 && sum(makeDays(todayISO, reducedToday, a, count).map(d => d.budget)) < need) count++;
+
+  // 普段の枠で締切順に並べたときの最大の遅れ。どう並べてもこれより小さくはならない
+  // （Jackson, 1955）ので、これを「足りない時間」として表示する
+  const normalDays = makeDays(todayISO, normalToday, a, count);
+  const shortfall = Math.ceil(Math.max(0, ...allocate([...pinned, ...withDue], normalDays).map(r => r.lateBy)));
+
+  // 普段の枠でも間に合わないときは、相談候補を選ぶ
+  const outIds = new Set(pickToRenegotiate(withDue, normalDays, pinnedMin).map(j => j.id));
+
+  // 並び順：自分で残したもの → 間に合うもの（締切順）→ 相談候補 → 締切なし
+  const order = [
+    ...pinned,
+    ...withDue.filter(j => !outIds.has(j.id)),
+    ...withDue.filter(j => outIds.has(j.id)),
+    ...noDue,
+  ];
+
+  const normal = allocate(order, normalDays);
+  let todayBudget = reducedToday;
+  let reduced = allocate(order, makeDays(todayISO, todayBudget, a, count));
+
+  // 安全ルール：今日を減らしたせいで新たに締切に遅れるものがあれば、
+  // 遅れる分だけ今日の枠を戻す（今日の枠を増やすと全部の締切が同じだけ後ろにずれるので、
+  // 一番大きい遅れぶんを戻せば全部まにあう）
+  const newlyLate = reduced.filter((r, i) => r.lateBy > 0.5 && normal[i].lateBy <= 0.5);
+  const addedBack = newlyLate.length ? Math.ceil(Math.max(...newlyLate.map(r => r.lateBy))) : 0;
+  if (addedBack > 0) {
+    todayBudget += addedBack;
+    reduced = allocate(order, makeDays(todayISO, todayBudget, a, count));
+  }
+
+  return {
+    est, base, factor, pinnedMin, normalToday, reducedToday, todayBudget, addedBack, shortfall,
+    normal, reduced, renegotiateIds: outIds,
+    days: makeDays(todayISO, todayBudget, a, count),
+  };
+}
+
+
+/* ── 9. 普段の計画と今日の計画の差 ＝「減らしたもの」──────────
+   後ろに送ったタスクには、必ず次にやる日を付ける。
+   未完了の目標でも、具体的な計画を立てると頭の中の干渉が消えた
+   （Masicampo & Baumeister, 2011）。                                    */
+
+function compareToday(plan, todayISO) {
+  const doing = [];
+  const reduced = [];
+  const late = [];
+  plan.reduced.forEach((r, i) => {
+    const usualMin = plan.normal[i].parts[todayISO] || 0;
+    const nowMin = r.parts[todayISO] || 0;
+    const later = Object.keys(r.parts).filter(d => d > todayISO).sort();
+    if (nowMin > 0) {
+      doing.push({ id: r.id, minutes: nowMin, pinned: r.pinned,
+                   finishes: later.length === 0, nextDate: later[0] ?? null });
+    }
+    if (usualMin - nowMin >= 1) {
+      reduced.push({ id: r.id, from: usualMin, to: nowMin,
+                     nextDate: later[0] ?? null, finishDate: later[later.length - 1] ?? todayISO });
+    }
+    if (r.lateBy > 0.5) {
+      late.push({ id: r.id, lateBy: r.lateBy, renegotiate: plan.renegotiateIds.has(r.id) });
+    }
+  });
+  return { doing, reduced, late };
+}
+
+
+/* ── 10. 睡眠規則性指数（SRI）──────────────────────────────
+   24時間ずれた2つの時刻で「寝ている／起きている」が一致する割合 p から
+     SRI = 200 × p − 100
+   毎日まったく同じ時刻に寝起きすれば100、でたらめなら0（Phillips ほか, 2017）。
+   ここでは日誌の就床・起床時刻から5分刻みで計算する簡易版。              */
+
+function sleepRegularityIndex(logs, fromISO, toISO, stepMin = 5) {
+  const dates = Object.keys(logs)
+    .filter(d => d >= fromISO && d <= toISO && sleepOf(logs[d]))
+    .sort();
+  if (dates.length < 3) return null;
+  const step = stepMin * 60000;
+  const day = 24 * 3600000;
+  const t0 = dateToMs(dates[0]) - day / 2;
+  const n = Math.round((dateToMs(dates[dates.length - 1]) + day / 2 - t0) / step);
+  const state = new Array(n).fill(null);        // null＝記録なし、0＝起きている、1＝寝ている
+
+  // 1件の記録は「前日12時〜当日12時」の24時間ぶんを表す
+  for (const d of dates) {
+    const from = Math.round((dateToMs(d) - day / 2 - t0) / step);
+    for (let i = from; i < from + day / step && i < n; i++) state[i] = 0;
+  }
+  for (const d of dates) {
+    const s = sleepOf(logs[d]);
+    for (let t = s.bedMs; t < s.wakeMs; t += step) {
+      const i = Math.floor((t - t0) / step);
+      if (i >= 0 && i < n && state[i] !== null) state[i] = 1;
+    }
+  }
+
+  const lag = day / step;
+  let same = 0;
+  let pairs = 0;
+  for (let i = 0; i + lag < n; i++) {
+    if (state[i] === null || state[i + lag] === null) continue;
+    pairs++;
+    if (state[i] === state[i + lag]) same++;
+  }
+  if (pairs < lag * 2) return null;              // 比べられるのが2日分に満たないときは出さない
+  return Math.round(200 * same / pairs - 100);
+}
+
+
+/* ── 11. ゾーンごとの達成率（仮定の倍率が妥当かを確かめる材料）──── */
+
+function zoneCompletion(logs) {
+  const out = {};
+  for (const z of ZONES) out[z.key] = { days: 0, planned: 0, done: 0 };
+  for (const log of Object.values(logs)) {
+    if (!log.zone || !(log.plannedMin > 0) || !out[log.zone]) continue;
+    const o = out[log.zone];
+    o.days += 1;
+    o.planned += log.plannedMin;
+    o.done += log.doneMin || 0;
+  }
+  return out;
+}
+
+
+/* ── 12. 道具（日付と計算）──────────────────────────────── */
+
+function isoOf(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+function partsOf(iso) { return iso.split('-').map(Number); }
+function dateToMs(iso) { const [y, m, d] = partsOf(iso); return new Date(y, m - 1, d).getTime(); }
+function addDays(iso, n) { const [y, m, d] = partsOf(iso); return isoOf(new Date(y, m - 1, d + n)); }
+function daysBetween(a, b) { return Math.round((dateToMs(b) - dateToMs(a)) / 86400000); }
+function weekdayOf(iso) { const [y, m, d] = partsOf(iso); return new Date(y, m - 1, d).getDay(); }
+function hmToMin(hm) { const [h, m] = hm.split(':').map(Number); return h * 60 + m; }
+function sum(xs) { return xs.reduce((s, x) => s + x, 0); }
+function clamp(x, lo, hi) { return Math.min(hi, Math.max(lo, x)); }
+function round2(x) { return Math.round(x * 100) / 100; }
+function median(xs) {
+  const s = [...xs].sort((p, q) => p - q);
+  const mid = Math.floor(s.length / 2);
+  return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
+}
+</script>
+<script>
+(() => {
+  'use strict';
+
+  /* ================================================================
+     画面の処理（表示・入力・保存）。判定の計算は「判定ロジック」側にある。
+     ================================================================ */
+
+  const KEY = 'replan.v2';
+  const WD = ['日', '月', '火', '水', '木', '金', '土'];
+  const TABS = ['today', 'tasks', 'log', 'basis'];
+  const AWAKE_CHOICES = [0, 15, 30, 60, 90];
+
+  // 尺度の文言（このアプリ用の日本語訳）
+  const KSS_LABELS = [
+    '非常にはっきり目覚めている', 'とてもはっきり目覚めている', '目覚めている',
+    'やや目覚めている', 'どちらでもない', '少し眠気がある',
+    '眠いが、起きているのに苦労はない', '眠く、起きているのに少し努力が要る',
+    'とても眠く、眠気と戦っている',
+  ];
+  const SP_LABELS = [
+    '完全に目覚めていて、はっきりしている', 'とても元気', 'まあ大丈夫、そこそこ元気',
+    '少し疲れている', 'そこそこ疲れていて、だるい',
+    'とても疲れていて、集中するのが非常に難しい', '疲れ切っていて、うまく動けない',
+  ];
+
+  /* ── 根拠の文章 ─────────────────────────────────── */
+  const WHY = {
+    last: {
+      body: [
+        '米国睡眠財団（NSF）は文献の系統的レビューをもとに、18〜25歳には7〜9時間を推奨し、6時間未満は推奨しないとしています。厚生労働省の「健康づくりのための睡眠ガイド2023」も、成人は6時間以上を目安にしています。この2本の線を、そのまま区切りに使っています。',
+      ],
+      note: '睡眠時間は「床にいた時間 − 眠れなかった時間」の自己申告です。',
+      cite: 'Hirshkowitz ほか (2015)／厚生労働省 (2024)',
+    },
+    avg: {
+      body: [
+        '睡眠を毎晩6時間（または4時間）に制限した14日間の実験では、注意や記憶の成績が日を追って下がり続けました。一方で本人の眠気の評価は数日で横ばいになり、低下にほとんど気づいていませんでした。',
+        'そこで、けさの体感とは別に、直近7晩の平均を独立した指標にしています。区切りは昨夜の睡眠と同じ7時間・6時間です。',
+      ],
+      note: '記録が少ないうちは判定に使いません（必要な晩数は根拠タブで変更できます）。',
+      cite: 'Van Dongen ほか (2003)',
+    },
+    kss: {
+      body: [
+        'カロリンスカ眠気尺度（KSS）は、いまの眠気を9段階で答える尺度で、脳波や反応課題の成績と対応することが確かめられています。徹夜の実験では、KSSは成績が落ちるおよそ3時間前から上がり始めました。',
+        '7は尺度の言葉で初めて「眠い」になる段階、8以上は起きているのに努力が要る段階です。眠気が高い段階ほど運転成績の悪化が急になるという結果から、8以上を2点にしています。',
+      ],
+      note: '9段階すべてに言葉を付けた版を使っています（奇数段階だけに言葉がある版とほぼ同じ回答になることが確かめられています：Miley ほか, 2016）。日本語の文言はこのアプリ用の訳です。',
+      cite: 'Åkerstedt & Gillberg (1990)／Kaida ほか (2006)／Manousakis ほか (2021)／Ingre ほか (2006)',
+    },
+    sp: {
+      body: [
+        'Samn-Perelli疲労尺度は、航空の疲労管理で使われてきた7段階の尺度です。4は「少し疲れている」、6は「とても疲れていて、集中するのが非常に難しい」と定義されています。この定義の言葉どおりに区切っています。',
+      ],
+      note: '日本語の文言はこのアプリ用の訳です。',
+      cite: 'Samn & Perelli (1982)',
+    },
+    sum: {
+      body: [
+        '4つの点数は同じ重みで足しています。どの指標をどれだけ重く見るべきかを推定できるデータがない段階では、等しい重みの単純な合計が予測に強いことが知られているためです。記録が十分に貯まれば、重みを推定し直せます。',
+        '合計0〜8点を2点ごとに4段階に分け、段階ごとに作業枠の倍率を決めています。この区切りと倍率は研究から直接は出てこない「設計上の仮定」なので、根拠タブで変えられるようにしています。',
+      ],
+      cite: 'Dawes (1979)',
+    },
+    order: {
+      body: [
+        'タスクは締切が早い順に並べ、日ごとの作業枠で区切って配っています。締切が早い順に並べると「いちばん遅れるタスクの遅れ」が最小になることが証明されています。締切が同じなら短いものを先にします。',
+        '今日の枠を小さくしたせいで新たに締切に遅れるものが出るときは、遅れる分だけ今日の枠を戻します。減らすのは、締切に響かない範囲だけです。',
+      ],
+      cite: 'Jackson (1955)／Smith (1956)',
+    },
+    moved: {
+      body: [
+        '後ろに送ったタスクには、必ず次にやる日を付けています。終わっていない目標は頭に残り続けますが、いつ・どうやるかの具体的な計画を立てると、その干渉が消えたという実験があるためです。',
+      ],
+      cite: 'Masicampo & Baumeister (2011)',
+    },
+    estimate: {
+      body: [
+        '人は作業時間を短く見積もりがちです。卒業論文の仕上がりを予測した学生は平均33.9日と答えましたが、実際には55.5日かかりました。ただし小さな作業はむしろ長めに見積もることもあり、ずれ方は作業の種類で変わります。',
+        'そこで初期値は控えめな1.25倍にし、完了したときに記録した実際の時間で、自分の倍率に置き換えていきます。記憶ではなく実際の記録を使うと、予測が正確になることも分かっています。',
+      ],
+      cite: 'Buehler ほか (1994)／Halkjelsvik & Jørgensen (2012)／Roy ほか (2008)',
+    },
+    risk: {
+      body: [
+        '足りない時間は、普段どおりの枠で締切順に並べたときの最大の遅れです。どう並べ替えても、これより小さくはなりません。',
+        '相談候補は、期限の延長や範囲の縮小を相談すれば残りが全部間に合うように、相談する数が最も少なくなる選び方で選んでいます。',
+      ],
+      cite: 'Jackson (1955)／Moore (1968)',
+    },
+    wake: {
+      body: [
+        '起きてから17時間たつと、ある追従課題の成績は、血中アルコール濃度0.05%のときと同じくらいまで下がりました。別の実験でも、17〜19時間の覚醒で一部の課題が0.05%と同等以下になりました。',
+      ],
+      cite: 'Dawson & Reid (1997)／Williamson & Feyer (2000)',
+    },
+    nap: {
+      body: [
+        '前の晩を約5時間睡眠にしたあと、午後の仮眠の長さを比べた実験では、10分の仮眠が直後から眠気・疲労・成績を改善しました。30分の仮眠では、起きた直後に一時的な低下（睡眠慣性）が出ました。',
+      ],
+      note: '表示する条件（眠気7以上、または昨夜6時間未満）はこのアプリの決めごとです。',
+      cite: 'Brooks & Lack (2006)',
+    },
+    sri: {
+      body: [
+        '睡眠規則性指数（SRI）は、24時間ずれた2つの時刻で「寝ている／起きている」が一致する割合から計算します。毎日まったく同じ時刻に寝起きすると100、でたらめなら0です。',
+        '学部生61人を30日追った研究では平均73（38〜86）で、SRIと成績には正の相関（r = 0.37）がありました。相関なので、規則正しくすれば成績が上がるとまでは言えません。',
+      ],
+      note: 'このアプリでは、日誌の就床・起床時刻から5分刻みで計算しています。計算方法の細部で値が変わる指標なので、研究の数値とは目安として比べてください。',
+      cite: 'Phillips ほか (2017)',
+    },
+  };
+
+  /* ── 根拠タブの一覧 ─────────────────────────────── */
+  const KIND = {
+    guide: { label: '指針', cls: '' },
+    study: { label: '研究', cls: '' },
+    scale: { label: '尺度の定義', cls: '' },
+    math: { label: '数理（証明あり）', cls: 'math' },
+    assume: { label: '設計上の仮定', cls: 'assume' },
+  };
+  const RULES = [
+    { kinds: ['guide'], title: '睡眠時間の区切り：7時間・6時間', fn: 'sleepPoints()',
+      body: 'NSFが18〜25歳に示した推奨（7〜9時間。6時間未満は推奨しない）と、厚労省の成人の目安（6時間以上）をそのまま使う。',
+      cite: 'Hirshkowitz ほか (2015)／厚生労働省 (2024)' },
+    { kinds: ['study'], title: '直近7晩の平均も、別の指標として見る', fn: 'sleepSummary()',
+      body: '慢性的な睡眠不足では、成績が下がり続けても本人の眠気の自覚は横ばいになる。けさの体感だけでは見落とす。',
+      cite: 'Van Dongen ほか (2003)' },
+    { kinds: ['scale', 'study'], title: '眠気（KSS）：7で1点、8以上で2点', fn: 'scoreState()',
+      body: 'KSSは脳波・反応課題の成績と対応し、成績低下より先に上がる。7は初めて「眠い」となる段階、8以上は起きているのに努力が要る段階で、高い段階ほど成績の悪化が急になる。',
+      cite: 'Åkerstedt & Gillberg (1990)／Kaida ほか (2006)／Ingre ほか (2006)／Manousakis ほか (2021)' },
+    { kinds: ['scale'], title: '疲れ（Samn-Perelli）：4〜5で1点、6以上で2点', fn: 'scoreState()',
+      body: '4＝少し疲れている、6＝集中するのが非常に難しい、という尺度の定義のまま区切る。',
+      cite: 'Samn & Perelli (1982)' },
+    { kinds: ['study'], title: '4つの指標を同じ重みで足す', fn: 'scoreState()',
+      body: '重みを推定するデータがないうちは、等しい重みの単純な合計が頑健に働く。',
+      cite: 'Dawes (1979)' },
+    { kinds: ['assume'], title: '合計0〜8点を2点刻みで4段階に分ける', fn: 'ZONES / zoneOf()',
+      body: '研究から直接は決まらない区切り。' },
+    { kinds: ['assume'], title: '作業枠の倍率：1.0／0.8／0.6／0.4', fn: 'DEFAULT_ASSUMPTIONS',
+      body: '研究は「睡眠不足で成績が下がる」までしか示さず、何割減らすべきかは示さない。仮置きして、ゾーン別の達成率で見直す。' },
+    { kinds: ['study', 'assume'], title: '見積もりの補正：初期値1.25倍 → 自分の実測へ', fn: 'estimateMultiplier()',
+      body: '作業時間は短く見積もられがちだが、小さな作業では逆もある。実測の記録を使うと予測が正確になる。初期値1.25と「記録3件ぶん」の重みは仮定。',
+      cite: 'Buehler ほか (1994)／Halkjelsvik & Jørgensen (2012)／Roy ほか (2008)' },
+    { kinds: ['math'], title: '締切が早い順に配る（同じ締切なら短い順）', fn: 'makePlan() / allocate()',
+      body: '締切順は「最大の遅れ」を最小にする並べ方。短い順は、同じ条件で平均の完了時刻を早くする。',
+      cite: 'Jackson (1955)／Smith (1956)' },
+    { kinds: ['math'], title: '間に合わないときの相談候補', fn: 'pickToRenegotiate()',
+      body: '相談（期限の延長・範囲の縮小）に回すタスクの数を最少にする選び方。',
+      cite: 'Moore (1968)' },
+    { kinds: ['assume'], title: '安全ルール：減らしても締切は守る', fn: 'makePlan()',
+      body: '今日の枠を小さくしたせいで新たに遅れるタスクがあれば、その分だけ今日の枠を戻す。' },
+    { kinds: ['study'], title: '後ろに送ったものには日付を付ける', fn: 'compareToday()',
+      body: '未完了の目標でも、具体的な計画を立てると頭の中の干渉が消えた。',
+      cite: 'Masicampo & Baumeister (2011)' },
+    { kinds: ['study'], title: '起床17時間後の目安を出す', fn: 'wakeLimitMs()',
+      body: '17時間の覚醒で、成績が血中アルコール濃度0.05%と同程度まで下がった。',
+      cite: 'Dawson & Reid (1997)／Williamson & Feyer (2000)' },
+    { kinds: ['study'], title: '仮眠は10分ほどを目安に出す', fn: '画面の表示',
+      body: '睡眠不足の翌日の午後、10分の仮眠が最も回復効果が高く、30分では起きた直後に一時的な低下が出た。',
+      cite: 'Brooks & Lack (2006)' },
+    { kinds: ['study'], title: '睡眠の規則性（SRI）を記録タブで見せる', fn: 'sleepRegularityIndex()',
+      body: '学部生でSRIと成績に正の相関があった。因果ではないので判定には使わず、記録として見せるだけにしている。',
+      cite: 'Phillips ほか (2017)' },
+  ];
+
+  const NOT_ADOPTED = [
+    { title: '「意志力ゲージ」（使うと減る意志力）',
+      body: '自我消耗と呼ばれる考え方。23の研究室・2,141人による事前登録の追試で効果はほぼゼロ（d = 0.04、95%信頼区間 −0.07〜0.15）だったため、指標に入れていません。',
+      cite: 'Hagger ほか (2016)' },
+    { title: '判定に生成AI（大規模言語モデル）を使うこと',
+      body: '同じ入力でも出力が揺れ、なぜその判定になったかを検証できないため使っていません。使うとしても、文章からタスク名や締切を読み取る補助までにとどめる想定です。' },
+    { title: '気分やストレスの点数',
+      body: '毎日1問で測る方法として根拠を示しにくく、判定に混ぜると説明できなくなるため入れていません。' },
+  ];
+
+  const LIMITS = [
+    '睡眠時間は自己申告です。計測機器の値とはずれることがあります。',
+    '根拠にした研究の多くは、実験室・運転・航空の場面のものです。学生の課題作業にそのまま当てはまるとは限りません。',
+    'KSSとSamn-Perelliの日本語の文言は、このアプリ用の訳です。日本語版KSSの妥当性は内山・中島（自動車技術会）が検証していますが、文言が同じとは限りません。',
+    '作業枠の倍率、ゾーンの区切り、見積もり補正の初期値は仮定です。記録タブの達成率で見直す前提です。',
+    '病気の診断や治療の助言はしません。強い眠気や疲れが続くときは医療機関に相談してください。',
+  ];
+
+  const REFS = [
+    ['Åkerstedt, T., & Gillberg, M. (1990). Subjective and objective sleepiness in the active individual. International Journal of Neuroscience, 52(1–2), 29–37.', 'https://doi.org/10.3109/00207459008994241'],
+    ['Brooks, A., & Lack, L. (2006). A brief afternoon nap following nocturnal sleep restriction: Which nap duration is most recuperative? Sleep, 29(6), 831–840.', 'https://doi.org/10.1093/sleep/29.6.831'],
+    ['Buehler, R., Griffin, D., & Ross, M. (1994). Exploring the "planning fallacy": Why people underestimate their task completion times. Journal of Personality and Social Psychology, 67(3), 366–381.', 'https://doi.org/10.1037/0022-3514.67.3.366'],
+    ['Dawes, R. M. (1979). The robust beauty of improper linear models in decision making. American Psychologist, 34(7), 571–582.', 'https://doi.org/10.1037/0003-066X.34.7.571'],
+    ['Dawson, D., & Reid, K. (1997). Fatigue, alcohol and performance impairment. Nature, 388, 235.', 'https://doi.org/10.1038/40775'],
+    ['Hagger, M. S., Chatzisarantis, N. L. D., et al. (2016). A multilab preregistered replication of the ego-depletion effect. Perspectives on Psychological Science, 11(4), 546–573.', 'https://doi.org/10.1177/1745691616652873'],
+    ['Halkjelsvik, T., & Jørgensen, M. (2012). From origami to software development: A review of studies on judgment-based predictions of performance time. Psychological Bulletin, 138(2), 238–271.', ''],
+    ['Hirshkowitz, M., Whiton, K., Albert, S. M., et al. (2015). National Sleep Foundation’s sleep time duration recommendations: Methodology and results summary. Sleep Health, 1(1), 40–43.', 'https://doi.org/10.1016/j.sleh.2014.12.010'],
+    ['Ingre, M., Åkerstedt, T., Peters, B., Anund, A., & Kecklund, G. (2006). Subjective sleepiness, simulated driving performance and blink duration: Examining individual differences. Journal of Sleep Research, 15(1), 47–53.', 'https://doi.org/10.1111/j.1365-2869.2006.00504.x'],
+    ['Jackson, J. R. (1955). Scheduling a production line to minimize maximum tardiness (Research Report 43). Management Science Research Project, University of California, Los Angeles.', ''],
+    ['Kaida, K., Takahashi, M., Åkerstedt, T., et al. (2006). Validation of the Karolinska sleepiness scale against performance and EEG variables. Clinical Neurophysiology, 117(7), 1574–1581.', 'https://doi.org/10.1016/j.clinph.2006.03.011'],
+    ['Kruger, J., & Evans, M. (2004). If you don’t want to be late, enumerate: Unpacking reduces the planning fallacy. Journal of Experimental Social Psychology, 40(5), 586–598.', ''],
+    ['Manousakis, J. E., Mann, N., Jeppe, K. J., & Anderson, C. (2021). Awareness of sleepiness: Temporal dynamics of subjective and objective sleepiness. Psychophysiology, 58(8), e13839.', 'https://doi.org/10.1111/psyp.13839'],
+    ['Masicampo, E. J., & Baumeister, R. F. (2011). Consider it done! Plan making can eliminate the cognitive effects of unfulfilled goals. Journal of Personality and Social Psychology, 101(4), 667–683.', 'https://doi.org/10.1037/a0024192'],
+    ['Miley, A. Å., Kecklund, G., & Åkerstedt, T. (2016). Comparing two versions of the Karolinska Sleepiness Scale (KSS). Sleep and Biological Rhythms, 14(3), 257–260.', 'https://doi.org/10.1007/s41105-016-0048-8'],
+    ['Moore, J. M. (1968). An n job, one machine sequencing algorithm for minimizing the number of late jobs. Management Science, 15(1), 102–109.', 'https://doi.org/10.1287/mnsc.15.1.102'],
+    ['Phillips, A. J. K., Clerx, W. M., O’Brien, C. S., et al. (2017). Irregular sleep/wake patterns are associated with poorer academic performance and delayed circadian and sleep/wake timing. Scientific Reports, 7, 3216.', 'https://doi.org/10.1038/s41598-017-03171-4'],
+    ['Roy, M. M., Mitten, S. T., & Christenfeld, N. J. S. (2008). Correcting memory improves accuracy of predicted task duration. Journal of Experimental Psychology: Applied, 14(3), 266–275.', 'https://doi.org/10.1037/1076-898X.14.3.266'],
+    ['Samn, S. W., & Perelli, L. P. (1982). Estimating aircrew fatigue: A technique with application to airlift operations (SAM-TR-82-21). USAF School of Aerospace Medicine.', ''],
+    ['Smith, W. E. (1956). Various optimizers for single-stage production. Naval Research Logistics Quarterly, 3(1–2), 59–66.', ''],
+    ['Van Dongen, H. P. A., Maislin, G., Mullington, J. M., & Dinges, D. F. (2003). The cumulative cost of additional wakefulness: Dose-response effects on neurobehavioral functions and sleep physiology from chronic sleep restriction and total sleep deprivation. Sleep, 26(2), 117–126.', 'https://doi.org/10.1093/sleep/26.2.117'],
+    ['Williamson, A. M., & Feyer, A.-M. (2000). Moderate sleep deprivation produces impairments in cognitive and motor performance equivalent to legally prescribed levels of alcohol intoxication. Occupational and Environmental Medicine, 57(10), 649–655.', 'https://doi.org/10.1136/oem.57.10.649'],
+    ['厚生労働省 (2024). 健康づくりのための睡眠ガイド2023.', 'https://www.mhlw.go.jp/content/001305530.pdf'],
+    ['内山祐司・中島清文. EU法に対応した日本語版カロリンスカ眠気尺度の収束的構成概念妥当性. 自動車技術会 論文（論文ID jt202403.27）.', 'https://tech.jsae.or.jp/paperinfo/ja/content/jt202403.27/'],
+  ];
+
+  /* ── 保存と読み込み ─────────────────────────────── */
+
+  const clone = x => JSON.parse(JSON.stringify(x));
+  const today = () => isoOf(new Date());
+
+  function blankStore() {
+    return { v: 2, sample: false, logs: {}, tasks: [], records: [], assumptions: clone(DEFAULT_ASSUMPTIONS), nextId: 1 };
+  }
+
+  function mergeAssumptions(a) {
+    const d = clone(DEFAULT_ASSUMPTIONS);
+    if (!a || typeof a !== 'object') return d;
+    return {
+      ...d,
+      ...a,
+      zoneFactor: { ...d.zoneFactor, ...(a.zoneFactor || {}) },
+      baseMinutes: Array.isArray(a.baseMinutes) && a.baseMinutes.length === 7 ? a.baseMinutes : d.baseMinutes,
+    };
+  }
+
+  function load() {
+    try {
+      const raw = localStorage.getItem(KEY);
+      if (raw) {
+        const d = JSON.parse(raw);
+        if (d && d.v === 2) {
+          d.assumptions = mergeAssumptions(d.assumptions);
+          d.logs = d.logs || {};
+          d.tasks = d.tasks || [];
+          d.records = d.records || [];
+          return d;
+        }
+      }
+    } catch (e) { /* 保存領域が使えない環境でも、サンプルで動かす */ }
+    return sampleStore(today());
+  }
+
+  function save() {
+    try { localStorage.setItem(KEY, JSON.stringify(store)); } catch (e) { /* 保存できなくても画面は動かす */ }
+  }
+
+  // サンプル：睡眠を削りがちな大学生の2週間
+  function sampleStore(t) {
+    const s = blankStore();
+    s.sample = true;
+    const nights = [
+      // [何日前, 寝た, 起きた, 眠れなかった分, KSS, Samn-Perelli]
+      [13, '00:40', '07:30', 15, 4, 3], [12, '01:10', '07:20', 15, 5, 3],
+      [11, '23:50', '07:10', 15, 3, 2], [10, '02:20', '09:40', 30, 4, 3],
+      [9, '01:30', '10:10', 15, 3, 2], [8, '00:50', '07:00', 15, 6, 4],
+      [7, '01:40', '07:00', 30, 7, 5], [6, '00:30', '07:10', 15, 5, 3],
+      [5, '01:20', '07:10', 15, 6, 4], [4, '02:00', '07:00', 30, 7, 5],
+      [3, '03:10', '10:30', 15, 4, 3], [2, '01:00', '09:30', 15, 3, 2],
+      [1, '00:40', '07:00', 15, 6, 4], [0, '01:50', '07:10', 15, 7, 5],
+    ];
+    for (const [ago, bed, wake, awakeMin, kss, sp] of nights) {
+      const date = addDays(t, -ago);
+      s.logs[date] = { date, bed, wake, awakeMin, kss, sp, plannedMin: 0, doneMin: 0, zone: null };
+    }
+    const rate = { A: 0.92, B: 0.8, C: 0.66, D: 0.55 };
+    nights.forEach(([ago], i) => {
+      if (ago === 0) return;
+      const date = addDays(t, -ago);
+      const log = s.logs[date];
+      const sc = scoreState({ ...sleepSummary(s.logs, date), kss: log.kss, sp: log.sp }, s.assumptions);
+      log.zone = sc.zone.key;
+      log.plannedMin = Math.round(s.assumptions.baseMinutes[weekdayOf(date)] * s.assumptions.zoneFactor[log.zone]);
+      log.doneMin = Math.round(log.plannedMin * (rate[log.zone] + ((i % 3) - 1) * 0.04));
+    });
+    const tasks = [
+      ['統計学 小テストの復習', 40, 1],
+      ['英語 単語テストの範囲を覚える', 25, 2],
+      ['経営戦略論 レポートの構成メモ', 45, 3],
+      ['ゼミ発表スライド（3〜5枚目）', 90, 5],
+      ['ES 志望動機の下書き', 60, 6],
+      ['部屋の片付け', 30, null],
+      ['気になっていた本を読む', 40, null],
+    ];
+    s.tasks = tasks.map(([title, estMin, off], i) => ({
+      id: 't' + (i + 1), title, estMin, due: off == null ? null : addDays(t, off), progressMin: 0, done: false,
+    }));
+    s.nextId = tasks.length + 1;
+    s.records = [
+      ['マーケティング論 小レポート', 60, 85, 12], ['ゼミの文献を読む', 30, 35, 10],
+      ['簿記の問題集 2章', 90, 130, 8], ['インターン応募フォーム', 45, 50, 6],
+      ['英語 予習', 20, 30, 4], ['統計学 課題プリント', 120, 160, 2],
+    ].map(([title, est, actual, ago]) => ({ title, est, actual, date: addDays(t, -ago) }));
+    return s;
+  }
+
+  /* ── 状態 ─────────────────────────────────────── */
+
+  let store = load();
+  const ui = { completing: null, adding: false, editing: null, confirm: null, codeOpen: false, steps: [], draft: {}, formError: '' };
+  let undoSnap = null;
+  let toastTimer = null;
+
+  const byId = id => store.tasks.find(x => x.id === id);
+
+  function defaultLog(t) {
+    const prev = Object.keys(store.logs).filter(d => d < t).sort().pop();
+    const src = prev ? store.logs[prev] : null;
+    return { date: t, bed: src ? src.bed : '00:00', wake: src ? src.wake : '07:00', awakeMin: 15,
+             kss: null, sp: null, plannedMin: 0, doneMin: 0, zone: null };
+  }
+
+  function compute() {
+    const t = today();
+    const a = store.assumptions;
+    const log = store.logs[t] || null;
+    const view = log || defaultLog(t);
+    const ss = sleepSummary(store.logs, t);
+    const score = scoreState({ ...ss, kss: log ? log.kss : null, sp: log ? log.sp : null }, a);
+    const recorded = !!(log && log.kss != null && log.sp != null);
+    const zoneKey = recorded ? score.zone.key : 'A';
+    const doneToday = log ? (log.doneMin || 0) : 0;
+    const plan = makePlan({ tasks: store.tasks, todayISO: t, zoneKey, doneTodayMin: doneToday, records: store.records, a });
+    const cmp = compareToday(plan, t);
+    if (log) {
+      log.plannedMin = Math.round(doneToday + sum(cmp.doing.map(d => d.minutes)));
+      log.zone = recorded ? zoneKey : null;
+    }
+    return { t, a, log, view, ss, score, recorded, zoneKey, doneToday, plan, cmp };
+  }
+
+  /* ── 表示の道具 ───────────────────────────────── */
+
+  function esc(s) {
+    return String(s ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+  }
+  function fmtHM(min) {
+    if (min == null || !isFinite(min)) return '—';
+    const m = Math.round(min);
+    return `${Math.floor(m / 60)}時間${String(m % 60).padStart(2, '0')}分`;
+  }
+  function fmtDur(min) { const m = Math.round(min); return `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`; }
+  function fmtClock(ms) { const d = new Date(ms); return `${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`; }
+  function fmtDate(iso) { if (!iso) return '—'; const [, m, d] = partsOf(iso); return `${m}/${d}（${WD[weekdayOf(iso)]}）`; }
+  function fmtDateShort(iso) { const [, m, d] = partsOf(iso); return `${m}/${d} ${WD[weekdayOf(iso)]}`; }
+  function fmtDateLong(iso) { const [, m, d] = partsOf(iso); return `${m}月${d}日（${WD[weekdayOf(iso)]}）`; }
+  function dueText(due, t) {
+    if (!due) return '締切なし';
+    const n = daysBetween(t, due);
+    const rel = n < 0 ? `${-n}日過ぎ` : n === 0 ? '今日' : n === 1 ? '明日' : `あと${n}日`;
+    return `締切 ${fmtDate(due)}・${rel}`;
+  }
+  function pts(p) {
+    if (p == null) return '<span class="pts none"><i></i><i></i>未記録</span>';
+    return `<span class="pts" aria-label="${p}点"><i class="${p >= 1 ? 'on' : ''}"></i><i class="${p >= 2 ? 'on' : ''}"></i>${p}点</span>`;
+  }
+  function why(id, summary, w) {
+    return `<details class="why" id="${id}"><summary>${summary}</summary>${w.body.map(p => `<p>${p}</p>`).join('')}${w.note ? `<p class="why-note">${w.note}</p>` : ''}${w.cite ? `<p class="cite">${w.cite}</p>` : ''}</details>`;
+  }
+
+  /* ── 今日タブ ─────────────────────────────────── */
+
+  function viewToday(c) {
+    return heroHTML(c) + indicatorsHTML(c) + completingHTML() + doingHTML(c) + reducedHTML(c) + riskHTML(c) + timeHTML(c);
+  }
+
+  function heroHTML(c) {
+    const z = c.score.zone;
+    const p = c.plan;
+    const extras = [];
+    if (c.doneToday > 0) extras.push(`済み ${c.doneToday}分`);
+    if (p.pinnedMin > 0) extras.push(`自分で残した分 ＋${p.pinnedMin}分`);
+    if (p.addedBack > 0) extras.push(`締切を守るため ＋${p.addedBack}分`);
+    return `
+    <section class="hero" aria-labelledby="zoneWord">
+      <p class="eyebrow">きょうの判定</p>
+      <h1 class="zone-word" id="zoneWord"><span class="mark">${c.recorded ? z.label : '記録待ち'}</span></h1>
+      <div class="meter" role="img" aria-label="4段階のうち${c.recorded ? z.label : 'まだ判定していません'}">
+        ${ZONES.map(zz => `<span class="seg${c.recorded && zz.key === z.key ? ' on' : ''}"><b>${zz.label}</b><small>${zz.min}〜${zz.max}点</small></span>`).join('')}
+      </div>
+      <dl class="calc">
+        <div><dt>状態スコア</dt><dd><b>${c.score.total}</b><span class="of"> / 8点</span></dd></div>
+        <div><dt>今日の作業枠</dt><dd>普段 ${p.base}分 × ${p.factor} ＝ <b>${Math.round(p.base * p.factor)}</b>分</dd></div>
+      </dl>
+      ${extras.length ? `<p class="formula-sub">${extras.join('　')}</p>` : ''}
+      ${c.recorded ? '' : '<p class="hint">いまの眠気と疲れを選ぶと、今日の作業枠が決まります。それまでは「いつも通り」の枠で計算しています。</p>'}
+    </section>`;
+  }
+
+  function indicatorsHTML(c) {
+    const it = c.score.items;
+    return `
+    <section class="block">
+      <h2>けさの記録と点数 <span class="aside">${c.score.total} / 8点</span></h2>
+      <div class="sheet">
+        ${indLast(c, it[0])}
+        ${indAvg(c, it[1])}
+        ${indScale('kss', '眠気', 'KSS', 9, KSS_LABELS, c.view.kss, it[2], WHY.kss)}
+        ${indScale('sp', '疲れ', 'Samn-Perelli', 7, SP_LABELS, c.view.sp, it[3], WHY.sp)}
+      </div>
+      ${why('w-sum', 'なぜ同じ重みで足す？ 段階と倍率は？', WHY.sum)}
+    </section>`;
+  }
+
+  function indLast(c, item) {
+    const v = c.view;
+    const s = sleepOf(v);
+    return `
+    <div class="ind">
+      <div class="ind-head"><h3>昨夜の睡眠</h3>${pts(item.points)}</div>
+      <div class="sleep-inputs">
+        <label class="tfield" for="in-bed"><span>寝た時刻</span><input type="time" id="in-bed" value="${esc(v.bed)}"></label>
+        <label class="tfield" for="in-wake"><span>起きた時刻</span><input type="time" id="in-wake" value="${esc(v.wake)}"></label>
+      </div>
+      <div class="chips" role="group" aria-label="寝つくまでと夜中に起きていた時間">
+        <span class="chips-label">寝つくまで＋夜中に起きていた時間</span>
+        ${AWAKE_CHOICES.map(m => `<button type="button" class="chip" data-act="awake" data-v="${m}" aria-pressed="${v.awakeMin === m}">${m}分</button>`).join('')}
+      </div>
+      <p class="value-line">睡眠 <b class="num">${s ? fmtHM(s.sleepMin) : '—'}</b><span class="sub">${s ? `床にいた ${fmtHM(s.inBedMin)} − ${v.awakeMin}分` : '時刻を確かめてください'}</span></p>
+      ${sleepBand(s ? s.sleepMin / 60 : null)}
+      ${why('w-last', 'なぜ6時間と7時間で区切る？', WHY.last)}
+    </div>`;
+  }
+
+  function sleepBand(h) {
+    const lo = 4;
+    const hi = 9;
+    const segs = [
+      { from: lo, to: CRITERIA.sleep.low, p: 2, label: `${CRITERIA.sleep.low}時間未満` },
+      { from: CRITERIA.sleep.low, to: CRITERIA.sleep.ok, p: 1, label: `${CRITERIA.sleep.low}〜${CRITERIA.sleep.ok}時間` },
+      { from: CRITERIA.sleep.ok, to: hi, p: 0, label: `${CRITERIA.sleep.ok}時間以上` },
+    ];
+    const hit = h == null ? null : sleepPoints(h);
+    const pin = h == null ? '' : `<span class="band-pin" style="left:${clamp((h - lo) / (hi - lo), 0, 1) * 100}%"></span>`;
+    return `<div class="band" style="grid-template-columns:${segs.map(sg => `${sg.to - sg.from}fr`).join(' ')}" aria-hidden="true">${pin}${segs.map(sg => `<span class="band-seg${sg.p === hit ? ' hit' : ''}">${sg.p}点<small>${sg.label}</small></span>`).join('')}</div>`;
+  }
+
+  function indAvg(c, item) {
+    const nights = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = addDays(c.t, -i);
+      const s = sleepOf(store.logs[d]);
+      nights.push({ d, h: s ? s.sleepMin / 60 : null });
+    }
+    const enough = c.ss.nights >= c.a.minNights;
+    return `
+    <div class="ind">
+      <div class="ind-head"><h3>直近7晩の平均睡眠</h3>${pts(item.points)}</div>
+      <p class="value-line">平均 <b class="num">${c.ss.avgSleepH != null ? fmtHM(c.ss.avgSleepH * 60) : '—'}</b><span class="sub">${c.ss.nights}晩ぶんの記録${enough ? '' : `（${c.a.minNights}晩たまるまで判定に使いません）`}</span></p>
+      ${weekBars(nights)}
+      ${why('w-avg', 'なぜ平均も別に見る？', WHY.avg)}
+    </div>`;
+  }
+
+  function weekBars(nights) {
+    const W = 300;
+    const H = 92;
+    const plotW = 268;
+    const top = 8;
+    const bottom = 18;
+    const maxH = 10;
+    const y = h => top + (1 - h / maxH) * (H - top - bottom);
+    const bw = plotW / 7;
+    // 7時間の線は線の上に、6時間の線は線の下にラベルを置いて重ならないようにする
+    const refs = [[CRITERIA.sleep.ok, '7h', -3], [CRITERIA.sleep.low, '6h', 10]]
+      .map(([h, t, dy]) => `<line class="wb-ref" x1="0" x2="${plotW}" y1="${y(h)}" y2="${y(h)}"/><text class="wb-ref-lab" x="${plotW + 4}" y="${y(h) + dy}">${t}</text>`).join('');
+    const bars = nights.map((n, i) => {
+      const x = i * bw + bw * 0.2;
+      const w = bw * 0.6;
+      const lab = `<text class="wb-lab" x="${i * bw + bw / 2}" y="${H - 4}">${WD[weekdayOf(n.d)]}</text>`;
+      if (n.h == null) return `${lab}<rect class="wb-none" x="${x}" y="${y(0) - 1}" width="${w}" height="1"/>`;
+      const hh = Math.min(n.h, maxH);
+      return `${lab}<rect class="wb-bar p${sleepPoints(n.h)}" x="${x}" y="${y(hh)}" width="${w}" height="${y(0) - y(hh)}"><title>${fmtDateShort(n.d)}：${fmtHM(n.h * 60)}</title></rect>`;
+    }).join('');
+    return `<svg class="weekbars" viewBox="0 0 ${W} ${H}" role="img" aria-label="直近7晩の睡眠時間。点線は7時間と6時間">${bars}${refs}</svg>`;
+  }
+
+  function indScale(key, name, sub, n, labels, value, item, w) {
+    const C = CRITERIA[key];
+    const bands = [[1, C.one - 1, 0], [C.one, C.two - 1, 1], [C.two, n, 2]];
+    const steps = Array.from({ length: n }, (_, i) => i + 1);
+    return `
+    <div class="ind">
+      <div class="ind-head"><h3>いまの${name}<small>${sub}</small></h3>${pts(item.points)}</div>
+      <div class="cells" style="grid-template-columns:repeat(${n},minmax(0,1fr))" role="group" aria-label="${name}を${n}段階から選ぶ">
+        ${steps.map(k => `<button type="button" class="cell" data-act="${key}" data-v="${k}" aria-pressed="${value === k}" aria-label="${k}：${labels[k - 1]}">${k}</button>`).join('')}
+      </div>
+      <div class="band" style="grid-template-columns:repeat(${n},minmax(0,1fr))" aria-hidden="true">
+        ${bands.map(([from, to, p]) => `<span class="band-seg${item.points === p ? ' hit' : ''}" style="grid-column:${from} / ${to + 1}">${p}点</span>`).join('')}
+      </div>
+      <p class="cell-label">${value == null ? 'いちばん近いものを選んでください' : `${value}：${labels[value - 1]}`}</p>
+      ${why('w-' + key, key === 'kss' ? 'なぜこの眠気の尺度と区切り？' : 'なぜこの疲れの尺度と区切り？', w)}
+    </div>`;
+  }
+
+  function completingHTML() {
+    if (!ui.completing) return '';
+    const t = byId(ui.completing);
+    if (!t) return '';
+    return `
+    <section class="block">
+      <h2>完了の記録</h2>
+      <form class="sheet done-form" id="actualForm">
+        <p><b>${esc(t.title)}</b> を完了にしました。</p>
+        <label class="field" for="in-actual">実際にかかった合計の時間（分）<input type="number" id="in-actual" inputmode="numeric" min="1" step="1" placeholder="見積もりは ${t.estMin}分"></label>
+        <p class="hint">記録すると、次からの見積もり補正があなたの実測に近づきます。</p>
+        <div class="row-btns"><button type="submit" class="btn">記録する</button><button type="button" class="btn ghost" data-act="skipActual">記録しない</button></div>
+      </form>
+    </section>`;
+  }
+
+  function doingHTML(c) {
+    const items = c.cmp.doing;
+    const total = Math.round(sum(items.map(d => d.minutes)));
+    const hasOpen = store.tasks.some(x => !x.done);
+    const usedUp = c.plan.todayBudget - c.plan.pinnedMin <= 0 && c.doneToday > 0;
+    const empty = usedUp ? '今日の作業枠は使い切りました。'
+      : hasOpen ? '今日の枠に入るタスクはありません。'
+      : '予定タブでタスクを追加すると、今日の分がここに出ます。';
+    const rows = items.map(d => {
+      const t = byId(d.id);
+      const meta = [dueText(t.due, c.t), `見積 ${t.estMin}分 ×${c.plan.est.m}`];
+      if (!d.finishes) meta.push(`今日は${Math.round(d.minutes)}分ぶん、残りは${fmtDate(d.nextDate)}から`);
+      if (t.progressMin) meta.push(`進めた分 ${t.progressMin}分`);
+      return `
+      <li class="task">
+        <button type="button" class="check" data-act="done" data-id="${t.id}" aria-label="${esc(t.title)}：今日の分を終えた"></button>
+        <div class="task-main">
+          <div class="task-title">${d.pinned ? '<span class="tag pen">自分で残した</span>' : ''}${esc(t.title)}</div>
+          <div class="task-meta">${meta.join('・')}</div>
+          ${d.pinned ? `<button type="button" class="btn-text" data-act="unpin" data-id="${t.id}">残すのをやめる</button>` : ''}
+        </div>
+        <div class="task-min">${Math.round(d.minutes)}<small>分</small></div>
+      </li>`;
+    }).join('');
+    return `
+    <section class="block">
+      <h2>今日やること <span class="aside">${items.length}件・${total}分</span></h2>
+      <ul class="list">${rows || `<li class="empty">${empty}</li>`}</ul>
+      ${why('w-order', 'どういう順番で入れている？', WHY.order)}
+    </section>`;
+  }
+
+  function reducedHTML(c) {
+    const items = c.cmp.reduced;
+    const lateIds = new Set(c.cmp.late.map(l => l.id));
+    if (!items.length) {
+      return c.recorded && c.zoneKey !== 'A'
+        ? '<section class="block"><h2>減らしたもの</h2><p class="empty">作業枠を小さくしても、動かす必要のあるタスクはありませんでした。</p></section>'
+        : '';
+    }
+    const total = Math.round(sum(items.map(r => r.from - r.to)));
+    const rows = items.map(r => {
+      const t = byId(r.id);
+      const ok = t.due && !lateIds.has(r.id) ? '（締切に間に合う計算）' : '';
+      return `
+      <li class="task moved">
+        <span class="moved-mark" aria-hidden="true"></span>
+        <div class="task-main">
+          <div class="task-title">${esc(t.title)}</div>
+          <div class="task-meta">今日 ${Math.round(r.from)}分 → ${Math.round(r.to)}分・${dueText(t.due, c.t)}${ok}</div>
+          <button type="button" class="btn-text" data-act="pin" data-id="${t.id}">やっぱり今日やる</button>
+        </div>
+        <div class="moved-to">${r.nextDate ? `→ ${fmtDate(r.nextDate)}` : '→ あとで'}</div>
+      </li>`;
+    }).join('');
+    return `
+    <section class="block">
+      <h2>減らしたもの <span class="aside">${items.length}件・${total}分</span></h2>
+      <ul class="list">${rows}</ul>
+      ${why('w-moved', 'なぜ行き先の日付を出す？', WHY.moved)}
+    </section>`;
+  }
+
+  function riskHTML(c) {
+    const late = c.cmp.late;
+    if (!late.length) return '';
+    const rows = late.map(l => {
+      const t = byId(l.id);
+      return `
+      <li class="task risk">
+        <span class="tag risk">${l.renegotiate ? '相談候補' : '遅れ'}</span>
+        <div class="task-main"><div class="task-title">${esc(t.title)}</div><div class="task-meta">${dueText(t.due, c.t)}・計画 ${Math.round(t.estMin * c.plan.est.m) - (t.progressMin || 0)}分</div></div>
+      </li>`;
+    }).join('');
+    return `
+    <section class="block">
+      <h2>このままだと間に合わないもの</h2>
+      <p class="risk-lead">普段どおりの枠でも、締切までに約 <b class="num">${c.plan.shortfall}分</b> 足りない計算です。</p>
+      <ul class="list">${rows}</ul>
+      <p class="hint">相談候補は、期限の延長や範囲の縮小を相談すれば、ほかが全部間に合うように選んでいます。</p>
+      ${why('w-risk', '足りない時間と相談候補の出し方', WHY.risk)}
+    </section>`;
+  }
+
+  function timeHTML(c) {
+    const s = sleepOf(c.view);
+    if (!s) return '';
+    const limit = wakeLimitMs(c.view);
+    const span = 24 * 3600000;
+    const pct = h => (h / 24) * 100;
+    const ticks = [0, 6, 12, CRITERIA.wakeHours, 24]
+      .map(h => `<span class="r-lab${h === CRITERIA.wakeHours ? ' key' : ''}" style="left:${pct(h)}%">${fmtClock(s.wakeMs + h * 3600000)}</span>`).join('');
+    const now = Date.now();
+    const nowMark = now > s.wakeMs && now < s.wakeMs + span
+      ? `<span class="r-now" style="left:${((now - s.wakeMs) / span) * 100}%"><em>いま</em></span>` : '';
+    const showNap = (c.view.kss != null && c.view.kss >= CRITERIA.kss.one) ||
+      (c.ss.lastSleepH != null && c.ss.lastSleepH < CRITERIA.sleep.low);
+    return `
+    <section class="block">
+      <h2>時間の目安</h2>
+      <p>起きてから17時間になるのは <b class="num big2">${fmtClock(limit)}</b>。この時刻より後には、注意の要る作業を置かないのが目安です。</p>
+      <div class="ruler" role="img" aria-label="起床${fmtClock(s.wakeMs)}からの24時間。17時間後は${fmtClock(limit)}">
+        <span class="r-after" style="left:${pct(CRITERIA.wakeHours)}%"></span>
+        <span class="r-line" style="left:${pct(CRITERIA.wakeHours)}%"></span>
+        ${nowMark}
+      </div>
+      <div class="r-labels" aria-hidden="true">${ticks}</div>
+      ${why('w-wake', 'なぜ17時間？', WHY.wake)}
+      ${showNap ? `<div class="nap"><p><b>仮眠をとるなら10分ほど。</b>30分寝ると、起きた直後はかえって頭が働きにくくなることがあります。</p>${why('w-nap', 'なぜ10分？', WHY.nap)}</div>` : ''}
+    </section>`;
+  }
+
+  /* ── 予定タブ ─────────────────────────────────── */
+
+  function viewTasks(c) {
+    return distributionHTML(c) + taskListHTML(c) + doneListHTML(c);
+  }
+
+  function distributionHTML(c) {
+    const byDay = {};
+    c.plan.reduced.forEach(r => {
+      Object.entries(r.parts).forEach(([d, m]) => { (byDay[d] = byDay[d] || []).push({ id: r.id, m }); });
+    });
+    const days = c.plan.days.slice(0, 7).map((d, i) => {
+      const items = byDay[d.date] || [];
+      const used = sum(items.map(x => x.m));
+      return `
+      <div class="day${i === 0 ? ' today' : ''}">
+        <div class="day-head"><b>${fmtDate(d.date)}</b>${i === 0 ? '<span class="tag">今日</span>' : ''}<span class="num">${Math.round(used)} / ${Math.round(d.budget)}分</span></div>
+        <div class="day-bar"><span style="width:${d.budget ? clamp(used / d.budget, 0, 1) * 100 : 0}%"></span></div>
+        ${items.length ? `<ul class="day-items">${items.map(x => `<li><span>${esc(byId(x.id).title)}</span><span class="m">${Math.round(x.m)}分</span></li>`).join('')}</ul>` : '<p class="day-empty">予定なし</p>'}
+      </div>`;
+    }).join('');
+    return `
+    <section class="block">
+      <h2>この先7日の配分 <span class="aside">見積もり補正 ×${c.plan.est.m}</span></h2>
+      <div class="days">${days}</div>
+      <p class="hint">体調で変わるのは今日の枠だけです。明日からは曜日ごとの普段の枠で計算しています（根拠タブで変更できます）。</p>
+    </section>`;
+  }
+
+  function taskListHTML(c) {
+    const open = store.tasks.filter(x => !x.done)
+      .sort((p, q) => (p.due || '9999').localeCompare(q.due || '9999'));
+    const late = new Set(c.cmp.late.map(l => l.id));
+    const rows = open.map(t => ui.editing === t.id
+      ? `<li class="task-edit">${taskFormHTML(t)}</li>`
+      : `
+      <li class="task plain">
+        <div class="task-main">
+          <div class="task-title">${late.has(t.id) ? '<span class="tag risk">間に合わない</span>' : ''}${esc(t.title)}</div>
+          <div class="task-meta">${dueText(t.due, c.t)}・見積 ${t.estMin}分 → 計画 ${Math.round(t.estMin * c.plan.est.m)}分${t.progressMin ? `・進めた分 ${t.progressMin}分` : ''}</div>
+        </div>
+        <button type="button" class="btn-text" data-act="editTask" data-id="${t.id}">編集</button>
+      </li>`).join('');
+    return `
+    <section class="block">
+      <h2>タスク <span class="aside">${open.length}件</span></h2>
+      ${ui.adding ? taskFormHTML(null) : '<button type="button" class="btn" data-act="newTask">＋ タスクを追加</button>'}
+      <ul class="list tasklist">${rows || '<li class="empty">まだタスクがありません。</li>'}</ul>
+    </section>`;
+  }
+
+  function taskFormHTML(t) {
+    const d = ui.draft;
+    const title = d.title ?? (t ? t.title : '');
+    const est = d.est ?? (t ? t.estMin : '');
+    const due = d.due ?? (t && t.due ? t.due : '');
+    const prog = d.prog ?? (t ? t.progressMin || 0 : 0);
+    const steps = ui.steps;
+    const stepTotal = sum(steps.map(s => Number(s.m) || 0));
+    const delBtn = !t ? ''
+      : ui.confirm === 'del-' + t.id
+        ? `<span class="confirm">このタスクを消しますか？ <button type="button" class="btn danger" data-act="deleteTask" data-id="${t.id}">消す</button></span>`
+        : `<button type="button" class="btn-text danger-text" data-act="askDelete" data-id="${t.id}">削除</button>`;
+    return `
+    <form class="sheet tform" id="taskForm" data-id="${t ? t.id : ''}" novalidate>
+      <label class="field" for="f-title">タスク名<input type="text" id="f-title" maxlength="60" value="${esc(title)}" placeholder="例：経営学レポートの下書き"></label>
+      <div class="field-row">
+        <label class="field" for="f-est">見積もり（分）<input type="number" id="f-est" min="5" step="5" inputmode="numeric" value="${esc(steps.length ? stepTotal || '' : est)}"${steps.length ? ' readonly' : ''}></label>
+        <label class="field" for="f-due">締切<input type="date" id="f-due" value="${esc(due)}"></label>
+      </div>
+      <p class="hint">締切を空けると「締切なし」になり、締切のあるタスクの後ろに回ります。</p>
+      <details class="why" id="w-steps"${steps.length ? ' open' : ''}>
+        <summary>手順に分けて見積もる</summary>
+        <p>作業を手順に分けて見積もると、まとめて見積もるより現実に近い時間になりやすいことが分かっています。手順の合計が見積もりになります。</p>
+        <p class="cite">Kruger & Evans (2004)</p>
+        <div class="steps-list">${steps.map((st, i) => `
+          <div class="step-row">
+            <input type="text" id="st-n-${i}" value="${esc(st.n)}" placeholder="手順${i + 1}" aria-label="手順${i + 1}の内容">
+            <input type="number" id="st-m-${i}" value="${esc(st.m || '')}" min="0" step="5" inputmode="numeric" aria-label="手順${i + 1}の分">
+            <button type="button" class="btn-text" data-act="removeStep" data-v="${i}" aria-label="手順${i + 1}を消す">消す</button>
+          </div>`).join('')}
+        </div>
+        <button type="button" class="btn-text" data-act="addStep">＋ 手順を足す</button>
+      </details>
+      ${t ? `<label class="field" for="f-prog">すでに進めた分（実際の分）<input type="number" id="f-prog" min="0" step="5" inputmode="numeric" value="${esc(prog)}"></label>` : ''}
+      ${ui.formError ? `<p class="form-error" role="alert">${esc(ui.formError)}</p>` : ''}
+      <div class="row-btns">
+        <button type="submit" class="btn">${t ? '保存する' : '追加する'}</button>
+        <button type="button" class="btn ghost" data-act="cancelForm">やめる</button>
+        ${delBtn}
+      </div>
+    </form>`;
+  }
+
+  function doneListHTML(c) {
+    const done = store.tasks.filter(x => x.done).sort((p, q) => (q.doneOn || '').localeCompare(p.doneOn || ''));
+    if (!done.length) return '';
+    return `
+    <section class="block">
+      <details class="why" id="w-done"><summary>完了したもの（${done.length}件）</summary>
+        <ul class="list">${done.map(t => `
+          <li class="task plain">
+            <div class="task-main"><div class="task-title">${esc(t.title)}</div><div class="task-meta">${t.doneOn ? `${fmtDate(t.doneOn)}に完了` : '完了'}・見積 ${t.estMin}分</div></div>
+            <button type="button" class="btn-text" data-act="reopen" data-id="${t.id}">未完了に戻す</button>
+          </li>`).join('')}
+        </ul>
+      </details>
+    </section>`;
+  }
+
+  /* ── 記録タブ ─────────────────────────────────── */
+
+  function viewLog(c) {
+    return diaryHTML(c) + estimateHTML(c) + zoneHTML(c) + proHTML();
+  }
+
+  function diaryHTML(c) {
+    const rows = [];
+    for (let i = 13; i >= 0; i--) {
+      const d = addDays(c.t, -i);
+      const s = sleepOf(store.logs[d]);
+      const winStart = dateToMs(d) - 6 * 3600000;          // 前日の18時から
+      let bar = '';
+      if (s) {
+        const l = clamp((s.bedMs - winStart) / 864e5, 0, 1) * 100;
+        const r = clamp((s.wakeMs - winStart) / 864e5, 0, 1) * 100;
+        bar = `<span class="d-bar" style="left:${l}%;width:${Math.max(0, r - l)}%"></span>`;
+      }
+      const p = s ? sleepPoints(s.sleepMin / 60) : null;
+      rows.push(`<div class="d-row${i === 0 ? ' today' : ''}"><span class="d-date">${fmtDateShort(d)}</span><span class="d-track">${bar}</span><span class="d-dur${p != null ? ' p' + p : ''}">${s ? fmtDur(s.sleepMin) : '—'}</span></div>`);
+    }
+    const sri = sleepRegularityIndex(store.logs, addDays(c.t, -13), c.t);
+    const hours = [18, 21, 0, 3, 6, 9, 12, 15, 18].map((h, i) => `<span style="left:${(i / 8) * 100}%">${h}</span>`).join('');
+    return `
+    <section class="block">
+      <h2>睡眠日誌 <span class="aside">直近14晩・前日18時〜当日18時</span></h2>
+      <div class="diary" role="img" aria-label="直近14晩の、寝た時刻から起きた時刻までの帯">
+        <div class="d-row d-head" aria-hidden="true"><span></span><span class="d-hours">${hours}</span><span></span></div>
+        ${rows.join('')}
+      </div>
+      <p class="legend"><span class="lg p0">7時間以上</span><span class="lg p1">6〜7時間</span><span class="lg p2">6時間未満</span><span>右の数字は眠れなかった分を引いた睡眠時間</span></p>
+      <div class="sri">
+        <div class="sri-num"><span>睡眠規則性指数（SRI）</span><b class="num">${sri == null ? '—' : sri}</b></div>
+        <p>${sri == null ? '3晩以上の記録がたまると計算します。' : '100に近いほど、毎日同じ時刻に寝起きしています。参考：学部生61人の研究では平均73（38〜86）。'}</p>
+        ${why('w-sri', 'SRIの計算方法と読み方', WHY.sri)}
+      </div>
+    </section>`;
+  }
+
+  function estimateHTML(c) {
+    const e = c.plan.est;
+    const recs = store.records.filter(r => r.est > 0 && r.actual > 0);
+    const formula = e.n
+      ? `<span class="num">(${e.n} × ${round2(e.personal)} ＋ ${e.k} × ${e.prior}) ÷ (${e.n} ＋ ${e.k}) ＝ <b class="big">${e.m}</b></span>`
+      : `記録がまだないので、初期値 <b class="num big">${e.prior}</b> を使っています`;
+    return `
+    <section class="block">
+      <h2>見積もりのクセ <span class="aside">いまの補正 ×${e.m}</span></h2>
+      <p class="formula">${formula}</p>
+      ${e.n ? `<p class="hint">あなたの実測の中央値 ${round2(e.personal)}倍と、初期値 ${e.prior}倍を、「記録${e.n}件：初期値${e.k}件ぶん」の重みで平均しています。</p>` : ''}
+      ${recs.length ? ratioStrip(recs, e.m) : ''}
+      ${recs.length ? `<ul class="rec-list">${recs.slice(-8).reverse().map(r => `<li><span>${esc(r.title || 'タスク')}</span><span class="num">${r.est}→${r.actual}分</span><span class="num">×${round2(r.actual / r.est)}</span></li>`).join('')}</ul>` : ''}
+      ${why('w-est', 'なぜ補正する？', WHY.estimate)}
+    </section>`;
+  }
+
+  function ratioStrip(recs, m) {
+    const W = 320;
+    const H = 58;
+    const lo = Math.log(0.5);
+    const hi = Math.log(3);
+    const x = r => 10 + ((Math.log(clamp(r, 0.5, 3)) - lo) / (hi - lo)) * (W - 20);
+    const ticks = [0.5, 1, 1.5, 2, 3].map(v => `<line class="st-axis" x1="${x(v)}" x2="${x(v)}" y1="34" y2="38"/><text class="st-lab" x="${x(v)}" y="52">×${v}</text>`).join('');
+    const dots = recs.map((r, i) => `<circle class="st-dot" cx="${x(r.actual / r.est)}" cy="${16 + (i % 3) * 6}" r="4"><title>${esc(r.title || '')}：×${round2(r.actual / r.est)}</title></circle>`).join('');
+    return `<svg class="strip" viewBox="0 0 ${W} ${H}" role="img" aria-label="実際の時間 ÷ 見積もりの分布。いまの補正は×${m}">
+      <line class="st-axis" x1="10" x2="${W - 10}" y1="36" y2="36"/>
+      <line class="st-one" x1="${x(1)}" x2="${x(1)}" y1="4" y2="36"/>
+      ${ticks}${dots}
+      <rect class="st-m" x="${x(m) - 5}" y="31" width="10" height="10" transform="rotate(45 ${x(m)} 36)"/>
+    </svg>`;
+  }
+
+  function zoneHTML(c) {
+    const past = {};
+    Object.keys(store.logs).filter(d => d < c.t).forEach(d => { past[d] = store.logs[d]; });
+    const z = zoneCompletion(past);
+    const rows = ZONES.map(zz => {
+      const o = z[zz.key];
+      const rate = o.planned ? Math.round((o.done / o.planned) * 100) : null;
+      return `<tr><td>${zz.label}</td><td class="num">×${c.a.zoneFactor[zz.key]}</td><td class="num">${o.days}日</td><td class="num">${o.planned}分</td><td class="num">${o.done}分</td><td class="num">${rate == null ? '—' : `${rate}%<span class="rbar"><i style="width:${Math.min(rate, 100)}%"></i></span>`}</td></tr>`;
+    }).join('');
+    return `
+    <section class="block">
+      <h2>ゾーン別の達成率 <span class="aside">今日をのぞく</span></h2>
+      <div class="table-wrap"><table class="ztable">
+        <thead><tr><th>ゾーン</th><th>倍率</th><th>日数</th><th>予定</th><th>実行</th><th>達成率</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table></div>
+      <p class="hint">倍率が合っていれば、どのゾーンでも達成率は同じくらいになるはずです。特定のゾーンだけ達成率が低いなら、そのゾーンの倍率を下げる余地があります。</p>
+    </section>`;
+  }
+
+  function proHTML() {
+    return `
+    <section class="block pro">
+      <h2>有料版で増える予定のもの <span class="aside">構想・未実装</span></h2>
+      <ul class="pro-list">
+        <li><b>30日・90日の傾向</b><span>睡眠時間・SRI・達成率の長い推移</span></li>
+        <li><b>曜日ごとのパターン</b><span>どの曜日にゾーンが重くなりやすいか</span></li>
+        <li><b>倍率の自動調整</b><span>ゾーン別の達成率から、作業枠の倍率を見直す</span></li>
+      </ul>
+      <p class="hint">無料版では、直近14晩の記録と、今日の判定・配分がすべて使えます。</p>
+    </section>`;
+  }
+
+  /* ── 根拠タブ ─────────────────────────────────── */
+
+  function viewBasis(c) {
+    return basisIntroHTML() + rulesHTML() + assumptionsHTML(c) + notAdoptedHTML() + limitsHTML() + codeHTML() + refsHTML() + dataHTML();
+  }
+
+  function basisIntroHTML() {
+    return `
+    <section class="hero">
+      <p class="eyebrow">根拠</p>
+      <h1 class="zone-word basis-title"><span class="mark">判定のルール</span></h1>
+      <p class="hint">このアプリの判定は、このページに書いたルールとコードだけで決まります。流れは次の3段階です。</p>
+      <ol class="flow">
+        <li>けさの記録を、4つの指標それぞれ0〜2点にして足す（0〜8点）</li>
+        <li>点数から4段階のゾーンを決め、普段の作業枠に倍率をかける</li>
+        <li>締切が早い順にタスクを配り、今日の枠からはみ出た分を、締切に間に合う日へ送る</li>
+      </ol>
+    </section>`;
+  }
+
+  function rulesHTML() {
+    const legend = Object.values(KIND).map(k => `<span class="kind ${k.cls}">${k.label}</span>`).join('');
+    const rows = RULES.map(r => `
+      <div class="rule">
+        <h3>${r.kinds.map(k => `<span class="kind ${KIND[k].cls}">${KIND[k].label}</span>`).join('')}<span>${r.title}</span></h3>
+        <p>${r.body}</p>
+        ${r.cite ? `<p class="cite">${r.cite}</p>` : ''}
+        <p class="fn">コード：${r.fn}</p>
+      </div>`).join('');
+    return `
+    <section class="block">
+      <h2>ルール一覧 <span class="aside">${RULES.length}項目</span></h2>
+      <p class="legend-kinds">${legend}<span>点線の枠は、研究からは直接決まらない値です。</span></p>
+      <div class="rules-grid">${rows}</div>
+    </section>`;
+  }
+
+  function assumptionsHTML(c) {
+    const a = c.a;
+    return `
+    <section class="block" id="assumptions">
+      <h2>仮定の数値 <span class="aside">変えるとすぐ判定に反映</span></h2>
+      <form class="sheet tform" id="assumpForm" novalidate>
+        <fieldset><legend>ゾーンごとの作業枠の倍率</legend>
+          <div class="form-grid">${ZONES.map(z => `<label class="field" for="a-z-${z.key}">${z.label}<input type="number" id="a-z-${z.key}" data-a="zone" data-k="${z.key}" min="0" max="1.5" step="0.05" value="${a.zoneFactor[z.key]}"></label>`).join('')}</div>
+        </fieldset>
+        <fieldset><legend>曜日ごとの普段の作業枠（分）</legend>
+          <div class="form-grid seven">${WD.map((w, i) => `<label class="field" for="a-b-${i}">${w}<input type="number" id="a-b-${i}" data-a="base" data-k="${i}" min="0" max="720" step="10" value="${a.baseMinutes[i]}"></label>`).join('')}</div>
+        </fieldset>
+        <fieldset><legend>そのほか</legend>
+          <div class="form-grid">
+            <label class="field" for="a-n">7日平均に必要な晩数<input type="number" id="a-n" data-a="minNights" min="1" max="7" step="1" value="${a.minNights}"></label>
+            <label class="field" for="a-p">見積もり補正の初期値<input type="number" id="a-p" data-a="estimatePrior" min="0.5" max="3" step="0.05" value="${a.estimatePrior}"></label>
+            <label class="field" for="a-w">初期値の重み（記録何件ぶん）<input type="number" id="a-w" data-a="estimatePriorWeight" min="0" max="20" step="1" value="${a.estimatePriorWeight}"></label>
+          </div>
+        </fieldset>
+        <div class="row-btns"><button type="button" class="btn ghost" data-act="resetAssumptions">初期値に戻す</button></div>
+      </form>
+    </section>`;
+  }
+
+  function notAdoptedHTML() {
+    return `
+    <section class="block">
+      <h2>あえて入れていないもの</h2>
+      <ul class="plain-list">${NOT_ADOPTED.map(n => `<li><b>${n.title}</b>　${n.body}${n.cite ? `<span class="cite">${n.cite}</span>` : ''}</li>`).join('')}</ul>
+    </section>`;
+  }
+
+  function limitsHTML() {
+    return `
+    <section class="block">
+      <h2>このアプリの限界</h2>
+      <ul class="plain-list">${LIMITS.map(l => `<li>${l}</li>`).join('')}</ul>
+    </section>`;
+  }
+
+  function highlight(src) {
+    const out = [];
+    const re = /\/\*[\s\S]*?\*\/|\/\/[^\n]*/g;
+    let last = 0;
+    let m;
+    while ((m = re.exec(src))) {
+      out.push(esc(src.slice(last, m.index)));
+      out.push(`<span class="c">${esc(m[0])}</span>`);
+      last = m.index + m[0].length;
+    }
+    out.push(esc(src.slice(last)));
+    return out.join('');
+  }
+
+  function codeHTML() {
+    const src = (document.getElementById('logic').textContent || '').trim();
+    const lines = src.split('\n').length;
+    return `
+    <section class="block" id="code">
+      <h2>判定ロジックのコード <span class="aside">${lines}行</span></h2>
+      <p>下のコードは、このページで実際に読み込まれて動いているスクリプトを、そのまま表示しています。判定に関わる計算はこれがすべてです。</p>
+      <div class="code-wrap${ui.codeOpen ? ' open' : ''}" tabindex="0" aria-label="判定ロジックのコード"><pre class="code"><code>${highlight(src)}</code></pre></div>
+      <button type="button" class="btn-text" data-act="toggleCode">${ui.codeOpen ? '折りたたむ' : '全部ひろげる'}</button>
+    </section>`;
+  }
+
+  function refsHTML() {
+    return `
+    <section class="block">
+      <h2>参考文献 <span class="aside">${REFS.length}件</span></h2>
+      <ul class="refs">${REFS.map(([text, url]) => `<li>${esc(text)}${url ? ` <a href="${esc(url)}" target="_blank" rel="noopener">${esc(url.replace(/^https:\/\//, ''))}</a>` : ''}</li>`).join('')}</ul>
+    </section>`;
+  }
+
+  function dataHTML() {
+    const sample = ui.confirm === 'sample'
+      ? '<span class="confirm">今の記録を消して、サンプルに戻しますか？ <button type="button" class="btn danger" data-act="loadSample">戻す</button> <button type="button" class="btn ghost" data-act="cancelConfirm">やめる</button></span>'
+      : '<button type="button" class="btn ghost" data-act="askSample">サンプルデータに戻す</button>';
+    const wipe = ui.confirm === 'wipe'
+      ? '<span class="confirm">すべての記録とタスクを消しますか？ <button type="button" class="btn danger" data-act="wipe">消す</button> <button type="button" class="btn ghost" data-act="cancelConfirm">やめる</button></span>'
+      : '<button type="button" class="btn ghost" data-act="askWipe">すべて消して最初から</button>';
+    return `
+    <section class="block">
+      <h2>データ</h2>
+      <p class="hint">記録はこのブラウザの中だけに保存されます。ほかの端末やブラウザとは共有されません。</p>
+      <div class="row-btns" style="margin-top:10px">${sample}${wipe}</div>
+    </section>`;
+  }
+
+  function sampleBarHTML() {
+    return ui.confirm === 'own'
+      ? '<span>サンプルを消して、空の状態から始めますか？</span><button type="button" class="btn danger" data-act="startOwn">始める</button><button type="button" class="btn ghost" data-act="cancelConfirm">やめる</button>'
+      : '<span><b>サンプルデータ</b>を表示しています。けさの記録を変えると、判定と配分がその場で変わります。</span><button type="button" class="btn ghost" data-act="askOwn">自分の記録で始める</button>';
+  }
+
+  /* ── 描画 ─────────────────────────────────────── */
+
+  function currentTab() {
+    const h = location.hash.replace('#', '');
+    return TABS.includes(h) ? h : 'today';
+  }
+
+  function rememberUI() {
+    const open = [...document.querySelectorAll('#view details[open][id]')].map(d => d.id);
+    const ae = document.activeElement;
+    let focus = null;
+    if (ae && ae !== document.body && document.getElementById('view').contains(ae)) {
+      if (ae.id) focus = '#' + CSS.escape(ae.id);
+      else if (ae.dataset && ae.dataset.act) {
+        focus = `[data-act="${ae.dataset.act}"]` +
+          (ae.dataset.v != null ? `[data-v="${ae.dataset.v}"]` : '') +
+          (ae.dataset.id ? `[data-id="${ae.dataset.id}"]` : '');
+      }
+    }
+    return { open, focus };
+  }
+
+  function restoreUI(k) {
+    k.open.forEach(id => { const d = document.getElementById(id); if (d) d.open = true; });
+    if (k.focus) {
+      const el = document.querySelector(k.focus);
+      if (el) el.focus({ preventScroll: true });
+    }
+  }
+
+  function render() {
+    const keep = rememberUI();
+    const c = compute();
+    save();
+    const tab = currentTab();
+    document.getElementById('app').classList.toggle('wide', tab === 'basis');
+    document.getElementById('topDate').textContent = fmtDateLong(c.t);
+    const bar = document.getElementById('sampleBar');
+    bar.hidden = !store.sample;
+    if (store.sample) bar.innerHTML = sampleBarHTML();
+    const view = document.getElementById('view');
+    view.innerHTML = tab === 'today' ? viewToday(c)
+      : tab === 'tasks' ? viewTasks(c)
+      : tab === 'log' ? viewLog(c)
+      : viewBasis(c);
+    document.querySelectorAll('.tabs a').forEach(a => {
+      if (a.dataset.tab === tab) a.setAttribute('aria-current', 'page');
+      else a.removeAttribute('aria-current');
+    });
+    restoreUI(keep);
+  }
+
+  /* ── 操作 ─────────────────────────────────────── */
+
+  function snapshot() { undoSnap = JSON.stringify(store); }
+
+  function toast(msg, undoable) {
+    const el = document.getElementById('toast');
+    el.innerHTML = `<span>${esc(msg)}</span>${undoable && undoSnap ? '<button type="button" data-act="undo">元に戻す</button>' : ''}`;
+    el.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { el.hidden = true; }, 6000);
+  }
+
+  function commit(msg, undoable) {
+    save();
+    render();
+    if (msg) toast(msg, undoable);
+  }
+
+  function undo() {
+    if (!undoSnap) return;
+    store = JSON.parse(undoSnap);
+    undoSnap = null;
+    ui.completing = null;
+    save();
+    render();
+    toast('元に戻しました', false);
+  }
+
+  function setLog(patch) {
+    const t = today();
+    const prev = store.logs[t] || defaultLog(t);
+    store.logs[t] = { ...prev, ...patch };
+    save();
+    render();
+  }
+
+  function completeToday(id) {
+    const c = compute();
+    const item = c.cmp.doing.find(d => d.id === id);
+    const task = byId(id);
+    if (!item || !task) return;
+    snapshot();
+    const minutes = Math.round(item.minutes);
+    const log = store.logs[c.t] || defaultLog(c.t);
+    log.doneMin = (log.doneMin || 0) + minutes;
+    store.logs[c.t] = log;
+    task.progressMin = (task.progressMin || 0) + minutes;
+    delete task.pinnedOn;
+    if (item.finishes) {
+      task.done = true;
+      task.doneOn = c.t;
+      ui.completing = id;
+      commit('完了にしました', true);
+    } else {
+      commit(`今日の分（${minutes}分）を記録しました`, true);
+    }
+  }
+
+  function recordActual(value) {
+    const task = byId(ui.completing);
+    const v = Math.round(Number(value));
+    if (task && v > 0) {
+      store.records.push({ title: task.title, est: task.estMin, actual: v, date: today() });
+    }
+    ui.completing = null;
+    commit(task && v > 0 ? `実際の時間（${v}分）を記録しました` : '', false);
+  }
+
+  function readSteps() {
+    ui.steps = ui.steps.map((s, i) => {
+      const n = document.getElementById(`st-n-${i}`);
+      const m = document.getElementById(`st-m-${i}`);
+      return { n: n ? n.value : s.n, m: m ? Number(m.value) || 0 : s.m };
+    });
+  }
+
+  function readDraft() {
+    const val = id => { const el = document.getElementById(id); return el ? el.value : undefined; };
+    ui.draft = { title: val('f-title'), est: val('f-est'), due: val('f-due'), prog: val('f-prog') };
+  }
+
+  function resetForm() {
+    ui.adding = false;
+    ui.editing = null;
+    ui.steps = [];
+    ui.draft = {};
+    ui.formError = '';
+    ui.confirm = null;
+  }
+
+  function saveTaskForm(form) {
+    readSteps();
+    readDraft();
+    const title = (ui.draft.title || '').trim();
+    const usableSteps = ui.steps.filter(s => (s.n || '').trim() || s.m > 0);
+    const est = usableSteps.length ? sum(usableSteps.map(s => s.m)) : Math.round(Number(ui.draft.est));
+    if (!title) { ui.formError = 'タスク名を入れてください。'; render(); return; }
+    if (!(est > 0)) { ui.formError = '見積もりの分を入れてください（手順に分けた場合は、手順の分を入れてください）。'; render(); return; }
+    const due = ui.draft.due || null;
+    snapshot();
+    const id = form.dataset.id;
+    if (id) {
+      const t = byId(id);
+      Object.assign(t, {
+        title, estMin: est, due, steps: usableSteps,
+        progressMin: Math.max(0, Math.round(Number(ui.draft.prog) || 0)),
+      });
+    } else {
+      store.tasks.push({ id: 't' + store.nextId++, title, estMin: est, due, progressMin: 0, done: false, steps: usableSteps });
+    }
+    resetForm();
+    commit(id ? '保存しました' : 'タスクを追加しました', true);
+  }
+
+  function setAssumption(el) {
+    const v = Number(el.value);
+    if (!Number.isFinite(v) || el.value === '') { render(); return; }
+    const a = store.assumptions;
+    const k = el.dataset.k;
+    if (el.dataset.a === 'zone') a.zoneFactor[k] = round2(clamp(v, 0, 1.5));
+    else if (el.dataset.a === 'base') a.baseMinutes[Number(k)] = Math.round(clamp(v, 0, 720));
+    else if (el.dataset.a === 'minNights') a.minNights = Math.round(clamp(v, 1, 7));
+    else if (el.dataset.a === 'estimatePrior') a.estimatePrior = round2(clamp(v, 0.5, 3));
+    else if (el.dataset.a === 'estimatePriorWeight') a.estimatePriorWeight = Math.round(clamp(v, 0, 20));
+    save();
+    render();
+  }
+
+  const focusLater = sel => setTimeout(() => { const el = document.querySelector(sel); if (el) el.focus(); }, 0);
+
+  document.addEventListener('click', e => {
+    const el = e.target.closest('[data-act]');
+    if (!el) return;
+    const { act, id, v } = el.dataset;
+    switch (act) {
+      case 'kss': setLog({ kss: Number(v) }); break;
+      case 'sp': setLog({ sp: Number(v) }); break;
+      case 'awake': setLog({ awakeMin: Number(v) }); break;
+      case 'done': completeToday(id); break;
+      case 'skipActual': ui.completing = null; render(); break;
+      case 'pin': snapshot(); byId(id).pinnedOn = today(); commit('今日やるほうに戻しました', true); break;
+      case 'unpin': snapshot(); delete byId(id).pinnedOn; commit('判定どおりの配分に戻しました', true); break;
+      case 'newTask': resetForm(); ui.adding = true; render(); focusLater('#f-title'); break;
+      case 'editTask': resetForm(); ui.editing = id; ui.steps = clone(byId(id).steps || []); render(); focusLater('#f-title'); break;
+      case 'cancelForm': resetForm(); render(); break;
+      case 'addStep': readSteps(); readDraft(); ui.steps.push({ n: '', m: 0 }); render(); focusLater(`#st-n-${ui.steps.length - 1}`); break;
+      case 'removeStep': readSteps(); readDraft(); ui.steps.splice(Number(v), 1); ui.draft.est = undefined; render(); break;
+      case 'askDelete': readDraft(); ui.confirm = 'del-' + id; render(); break;
+      case 'deleteTask': snapshot(); store.tasks = store.tasks.filter(x => x.id !== id); resetForm(); commit('タスクを削除しました', true); break;
+      case 'reopen': snapshot(); { const t = byId(id); t.done = false; delete t.doneOn; } commit('未完了に戻しました', true); break;
+      case 'resetAssumptions': snapshot(); store.assumptions = clone(DEFAULT_ASSUMPTIONS); commit('仮定の数値を初期値に戻しました', true); break;
+      case 'toggleCode': ui.codeOpen = !ui.codeOpen; render(); break;
+      case 'askOwn': ui.confirm = 'own'; render(); break;
+      case 'askSample': ui.confirm = 'sample'; render(); break;
+      case 'askWipe': ui.confirm = 'wipe'; render(); break;
+      case 'cancelConfirm': ui.confirm = null; render(); break;
+      case 'startOwn':
+      case 'wipe': snapshot(); store = blankStore(); resetForm(); ui.completing = null; commit('空の状態から始めます', true); break;
+      case 'loadSample': snapshot(); store = sampleStore(today()); resetForm(); ui.completing = null; commit('サンプルデータに戻しました', true); break;
+      case 'undo': undo(); break;
+      default: break;
+    }
+  });
+
+  document.addEventListener('change', e => {
+    const el = e.target;
+    if (el.id === 'in-bed' && el.value) setLog({ bed: el.value });
+    else if (el.id === 'in-wake' && el.value) setLog({ wake: el.value });
+    else if (el.dataset && el.dataset.a) setAssumption(el);
+  });
+
+  document.addEventListener('input', e => {
+    const el = e.target;
+    if (!el.closest || !el.closest('#taskForm')) return;
+    if (el.id.startsWith('st-')) {
+      readSteps();
+      const total = sum(ui.steps.map(s => Number(s.m) || 0));
+      const est = document.getElementById('f-est');
+      if (est) est.value = total || '';
+    }
+    readDraft();
+  });
+
+  document.addEventListener('submit', e => {
+    e.preventDefault();
+    if (e.target.id === 'taskForm') saveTaskForm(e.target);
+    else if (e.target.id === 'actualForm') recordActual(document.getElementById('in-actual').value);
+  });
+
+  window.addEventListener('hashchange', () => { ui.confirm = null; render(); window.scrollTo(0, 0); });
+
+  render();
+})();
+</script>
+
+</body></html>
